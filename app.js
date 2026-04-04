@@ -39,6 +39,20 @@ const MONTH_GENITIVE = [
   "ноября",
   "декабря",
 ];
+const MONTHLY_FLOWER_PHOTOS = [
+  { name: "Камелия", src: "./images/flowers/camellia.jpg" },
+  { name: "Камелия", src: "./images/flowers/camellia.jpg" },
+  { name: "Крокусы", src: "./images/flowers/crocus.jpg" },
+  { name: "Тюльпаны", src: "./images/flowers/tulip.jpg" },
+  { name: "Тюльпаны", src: "./images/flowers/tulip.jpg" },
+  { name: "Ирисы", src: "./images/flowers/iris.jpg" },
+  { name: "Ромашки", src: "./images/flowers/daisy.jpg" },
+  { name: "Подсолнухи", src: "./images/flowers/sunflower.jpg" },
+  { name: "Подсолнухи", src: "./images/flowers/sunflower.jpg" },
+  { name: "Хризантемы", src: "./images/flowers/chrysanthemum.jpg" },
+  { name: "Хризантемы", src: "./images/flowers/chrysanthemum.jpg" },
+  { name: "Камелия", src: "./images/flowers/camellia.jpg" },
+];
 const MONTHLY_BLOOMS = [
   { name: "морозник", shape: "droop", petal: "#d9d0ea", accent: "#b9aad7", stem: "#c7bfdc" },
   { name: "подснежник", shape: "bell", petal: "#edf4ff", accent: "#cddcf7", stem: "#b9d0c0" },
@@ -58,6 +72,8 @@ const ui = {
   holidayStatus: document.querySelector("#holidayStatus"),
   legendStrip: document.querySelector("#legendStrip"),
   monthLabel: document.querySelector("#monthLabel"),
+  monthPhotoImage: document.querySelector("#monthPhotoImage"),
+  monthPhotoName: document.querySelector("#monthPhotoName"),
   todayDateLabel: document.querySelector("#todayDateLabel"),
   quoteText: document.querySelector("#quoteText"),
   brushPicker: document.querySelector("#brushPicker"),
@@ -379,6 +395,7 @@ function renderBrushPicker() {
 function render() {
   renderTodayDate();
   renderMonthHeading();
+  renderMonthPhoto();
   renderLegend();
   renderBrushPicker();
   renderCustomBrushes();
@@ -437,7 +454,17 @@ function renderMonthHeading() {
   const formatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
   const monthText = formatter.format(viewDate);
   ui.monthLabel.textContent = monthText.charAt(0).toUpperCase() + monthText.slice(1);
-  applyMonthlyBloomBackdrop(viewDate.getMonth());
+}
+
+function renderMonthPhoto() {
+  const photo = MONTHLY_FLOWER_PHOTOS[viewDate.getMonth()] || MONTHLY_FLOWER_PHOTOS[today.getMonth()];
+  if (!ui.monthPhotoImage || !ui.monthPhotoName || !photo) {
+    return;
+  }
+
+  ui.monthPhotoImage.src = photo.src;
+  ui.monthPhotoImage.alt = `${photo.name} в этом месяце`;
+  ui.monthPhotoName.textContent = photo.name;
 }
 
 function applyMonthlyBloomBackdrop(monthIndex) {
