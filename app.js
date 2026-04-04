@@ -3,7 +3,7 @@ const THEME_STORAGE_KEY = "shift-calendar-theme-v1";
 const LEGACY_QUOTE_STORAGE_KEY = "shift-calendar-last-quote-v1";
 const FORTUNE_STATE_KEY = "shift-calendar-fortune-v1";
 const FORTUNE_TEST_PASSWORD = "456347";
-const FORTUNE_CLICKS_TO_OPEN = 4;
+const FORTUNE_CLICKS_TO_OPEN = 1;
 const PREDICTION_DATA_URL = "./predictions.json";
 const HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 const COUNTRY_CODE = "RU";
@@ -461,22 +461,16 @@ function renderLegend() {
 
 function renderQuote() {
   dailyFortuneState = ensureFortuneStateForToday(dailyFortuneState);
-  ui.fortuneLabel.textContent = dailyFortuneState.revealed ? "предсказание дня" : "печенька дня";
+  ui.fortuneLabel.textContent = dailyFortuneState.revealed ? "предсказание дня" : "конверт дня";
   ui.quoteText.textContent = currentQuote;
   ui.quoteText.hidden = !dailyFortuneState.revealed;
   ui.fortuneCookieButton.hidden = false;
-  ui.fortuneCookieButton.classList.remove("is-crack-1", "is-crack-2", "is-crack-3", "is-open");
+  ui.fortuneCookieButton.classList.remove("is-open");
 
   if (dailyFortuneState.revealed) {
     ui.fortuneCookieButton.classList.add("is-open");
     return;
   }
-
-  const cracks = Math.max(0, Math.min(FORTUNE_CLICKS_TO_OPEN, dailyFortuneState.cracks || 0));
-  if (cracks >= 1) ui.fortuneCookieButton.classList.add("is-crack-1");
-  if (cracks >= 2) ui.fortuneCookieButton.classList.add("is-crack-2");
-  if (cracks >= 3) ui.fortuneCookieButton.classList.add("is-crack-3");
-  if (cracks >= FORTUNE_CLICKS_TO_OPEN) ui.fortuneCookieButton.classList.add("is-open");
 }
 
 function renderMonthHeading() {
@@ -1809,7 +1803,7 @@ function crackFortuneCookie() {
 }
 
 function openSecretFortuneReset() {
-  const password = window.prompt("Введите пароль, чтобы снова показать печеньку дня.");
+  const password = window.prompt("Введите пароль, чтобы снова показать конверт дня.");
   if (password === null) {
     return;
   }
@@ -1822,7 +1816,7 @@ function openSecretFortuneReset() {
   dailyFortuneState = createDefaultFortuneState();
   persistFortuneState();
   renderQuote();
-  window.alert("Печенька дня снова закрыта. Можно проверить механику.");
+  window.alert("Конверт дня снова закрыт. Можно проверить механику.");
 }
 
 async function initializeQuote() {
