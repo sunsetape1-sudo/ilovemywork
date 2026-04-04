@@ -146,8 +146,8 @@ h1 {
 .fortune-cookie-shape {
   position: relative;
   display: block;
-  width: 88px;
-  height: 58px;
+  width: 112px;
+  height: 74px;
   transition: transform 240ms ease;
 }
 
@@ -162,21 +162,26 @@ h1 {
 }
 
 .fortune-envelope-back {
-  top: 10px;
-  width: 74px;
-  height: 42px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #efe6d7 0%, #e5d7c0 100%);
-  box-shadow: inset 0 0 0 1px rgba(126, 108, 79, 0.08);
+  top: 12px;
+  width: 96px;
+  height: 56px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, #f2e8d9 0%, #e7dac4 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 108, 79, 0.08),
+    0 10px 24px rgba(96, 78, 54, 0.1);
 }
 
 .fortune-envelope-paper {
-  top: 8px;
-  width: 54px;
-  height: 30px;
-  border-radius: 8px;
+  top: 10px;
+  width: 72px;
+  height: 40px;
+  border-radius: 10px;
   background: linear-gradient(180deg, #fffef9 0%, #f1e9db 100%);
-  box-shadow: inset 0 0 0 1px rgba(143, 127, 100, 0.12), 0 4px 10px rgba(79, 63, 39, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(143, 127, 100, 0.12),
+    0 8px 16px rgba(79, 63, 39, 0.1);
   opacity: 0.92;
   transition: transform 320ms cubic-bezier(.22,.61,.36,1), top 320ms cubic-bezier(.22,.61,.36,1);
 }
@@ -186,7 +191,7 @@ h1 {
   content: "";
   position: absolute;
   left: 50%;
-  width: 28px;
+  width: 40px;
   height: 2px;
   border-radius: 999px;
   background: rgba(86, 72, 49, 0.18);
@@ -194,20 +199,23 @@ h1 {
 }
 
 .fortune-envelope-paper::before {
-  top: 9px;
+  top: 13px;
 }
 
 .fortune-envelope-paper::after {
-  top: 15px;
+  top: 21px;
 }
 
 .fortune-envelope-front {
-  top: 24px;
-  width: 74px;
-  height: 28px;
-  border-radius: 0 0 10px 10px;
-  background: linear-gradient(180deg, #ebe1d0 0%, #dfd0b8 100%);
-  box-shadow: inset 0 0 0 1px rgba(126, 108, 79, 0.08);
+  top: 30px;
+  width: 96px;
+  height: 38px;
+  border-radius: 0 0 14px 14px;
+  background:
+    linear-gradient(180deg, #ecdfcc 0%, #ddceb7 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 108, 79, 0.08),
+    0 4px 10px rgba(96, 78, 54, 0.05);
 }
 
 .fortune-envelope-front::before,
@@ -215,8 +223,8 @@ h1 {
   content: "";
   position: absolute;
   bottom: 0;
-  width: 37px;
-  height: 26px;
+  width: 48px;
+  height: 34px;
   background: linear-gradient(180deg, #eee4d4 0%, #deceba 100%);
 }
 
@@ -231,30 +239,34 @@ h1 {
 }
 
 .fortune-envelope-flap {
-  top: 10px;
-  width: 74px;
-  height: 28px;
+  top: 12px;
+  width: 96px;
+  height: 36px;
   transform: translateX(-50%) rotateX(0deg);
   transform-origin: center top;
   transition: transform 360ms cubic-bezier(.22,.61,.36,1);
+  filter: drop-shadow(0 4px 10px rgba(104, 80, 54, 0.06));
 }
 
 .fortune-envelope-flap::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, #f4ebdc 0%, #e7d8c2 100%);
+  background:
+    linear-gradient(180deg, #f7edde 0%, #e8d9c3 100%);
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   box-shadow: inset 0 0 0 1px rgba(126, 108, 79, 0.08);
 }
 
 .fortune-envelope-seal {
-  top: 24px;
-  width: 12px;
-  height: 12px;
+  top: 30px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: linear-gradient(180deg, #c9838f 0%, #a95f6f 100%);
-  box-shadow: 0 3px 8px rgba(98, 51, 61, 0.16);
+  box-shadow:
+    0 4px 10px rgba(98, 51, 61, 0.18),
+    inset 0 0 0 1px rgba(115, 62, 72, 0.12);
   transition: transform 240ms ease, opacity 160ms ease;
 }
 
@@ -271,7 +283,7 @@ h1 {
 }
 
 .fortune-cookie.is-open .fortune-envelope-paper {
-  top: -4px;
+  top: -8px;
   transform: translateX(-50%) rotate(-1.5deg);
 }
 
@@ -281,14 +293,14 @@ h1 {
 }
 
 .fortune-text {
-  max-width: 268px;
+  max-width: 288px;
   margin: -2px auto 0;
-  padding: 8px 14px 10px;
+  padding: 9px 15px 11px;
   border-radius: 18px;
   background: linear-gradient(180deg, #fffdf8 0%, #f6f0e5 100%);
   box-shadow: 0 10px 18px rgba(95, 79, 58, 0.12), inset 0 0 0 1px rgba(141, 120, 88, 0.1);
   font-family: "Caveat", cursive;
-  font-size: clamp(1rem, 3.6vw, 1.42rem);
+  font-size: clamp(1.05rem, 3.7vw, 1.5rem);
   line-height: 1.02;
   text-align: center;
   transform: translateY(-10px);
