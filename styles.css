@@ -702,18 +702,6 @@ html[data-theme="dark"] .custom-delete-button {
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.custom-ring {
-  position: absolute;
-  top: calc(-1 * var(--ring-inset));
-  right: calc(-1 * var(--ring-inset));
-  bottom: calc(-1 * var(--ring-inset));
-  left: calc(-1 * var(--ring-inset));
-  border: 2px solid var(--ring-color);
-  border-radius: 54% 46% 52% 48% / 44% 53% 47% 56%;
-  transform: rotate(var(--ring-rotation));
-  pointer-events: none;
-}
-
 .day-cell.is-work .day-marker::before,
 .day-cell.is-work .day-marker::after {
   opacity: 1;
@@ -733,10 +721,24 @@ html[data-theme="dark"] .custom-delete-button {
 .day-number {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.85rem;
+  height: 1.85rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
   font-family: "Caveat", cursive;
   font-size: 1.45rem;
   font-weight: 700;
   line-height: 1;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.day-cell.has-custom-mark .day-number {
+  background: var(--custom-day-color);
+  color: var(--custom-day-text);
+  box-shadow: 0 2px 10px rgba(31, 26, 47, 0.12);
 }
 
 .details-panel {

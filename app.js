@@ -449,6 +449,7 @@ function renderCalendar() {
     const dateKey = formatDateKey(year, month, day);
     const entry = initialState.entries[dateKey] || {};
     const customProcedures = getProceduresForEntry(entry);
+    const primaryCustomProcedure = customProcedures.at(-1) || null;
     const holiday = getHolidayByDate(dateKey);
     const isToday = dateKey === formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
     const isSelected = dateKey === selectedDateKey;
@@ -463,6 +464,14 @@ function renderCalendar() {
     button.classList.toggle("is-holiday", Boolean(holiday));
     button.classList.toggle("is-today", isToday);
     button.classList.toggle("is-selected", isSelected);
+    button.classList.toggle("has-custom-mark", Boolean(primaryCustomProcedure));
+    if (primaryCustomProcedure) {
+      button.style.setProperty("--custom-day-color", primaryCustomProcedure.color);
+      button.style.setProperty("--custom-day-text", getReadableTextColor(primaryCustomProcedure.color));
+    } else {
+      button.style.removeProperty("--custom-day-color");
+      button.style.removeProperty("--custom-day-text");
+    }
     button.setAttribute("aria-pressed", String(isSelected));
     button.setAttribute(
       "aria-label",
@@ -481,15 +490,6 @@ function renderCalendar() {
 
     const marker = document.createElement("span");
     marker.className = "day-marker";
-    customProcedures.forEach((procedure, index) => {
-      const ring = document.createElement("span");
-      ring.className = "custom-ring";
-      ring.setAttribute("aria-hidden", "true");
-      ring.style.setProperty("--ring-color", procedure.color);
-      ring.style.setProperty("--ring-inset", `${5 + index * 4}px`);
-      ring.style.setProperty("--ring-rotation", `${index % 2 === 0 ? -13 - index * 2 : 11 + index * 2}deg`);
-      marker.append(ring);
-    });
     const number = document.createElement("span");
     number.className = "day-number";
     number.textContent = String(day);
@@ -1040,6 +1040,15 @@ function normalizeProcedureKey(value) {
 function normalizeHexColor(value) {
   const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
   return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : DEFAULT_CUSTOM_COLOR;
+}
+
+function getReadableTextColor(color) {
+  const normalized = normalizeHexColor(color);
+  const red = Number.parseInt(normalized.slice(1, 3), 16);
+  const green = Number.parseInt(normalized.slice(3, 5), 16);
+  const blue = Number.parseInt(normalized.slice(5, 7), 16);
+  const brightness = red * 0.299 + green * 0.587 + blue * 0.114;
+  return brightness > 176 ? "#1f1a2f" : "#ffffff";
 }
 
 function getValidCustomProcedureIds() {
