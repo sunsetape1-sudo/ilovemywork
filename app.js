@@ -598,7 +598,9 @@ function renderSelectedDay() {
     ui.selectedDayTags.append(element);
   });
 
-  ui.selectedDayCopy.textContent = buildSelectedDayCopy(entry, customProcedures, holiday);
+  const selectedDayCopy = buildSelectedDayCopy(entry, customProcedures, holiday);
+  ui.selectedDayCopy.textContent = selectedDayCopy;
+  ui.selectedDayCopy.hidden = !selectedDayCopy;
 
   ui.noteInput.value = entry.note || "";
   ui.clearNoteButton.disabled = !entry.note;
@@ -1622,21 +1624,6 @@ async function importDataBackup(file) {
 
 function buildSelectedDayCopy(entry, customProcedures, holiday) {
   const parts = [];
-  const marks = [];
-
-  if (entry.work) {
-    marks.push("смена");
-  }
-
-  if (customProcedures.length) {
-    marks.push(...customProcedures.map((procedure) => procedure.name));
-  }
-
-  if (marks.length) {
-    parts.push(`Отметки на день: ${marks.join(", ")}.`);
-  } else {
-    parts.push("Этот день без отметок.");
-  }
 
   if (entry.note) {
     parts.push("Есть сохранённая заметка.");
