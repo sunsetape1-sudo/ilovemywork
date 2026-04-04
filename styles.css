@@ -137,7 +137,7 @@ h1 {
   justify-items: center;
   width: 100%;
   margin-top: 6px;
-  padding: 2px 0 0;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -146,42 +146,97 @@ h1 {
 .fortune-cookie-shape {
   position: relative;
   display: block;
-  width: 88px;
-  height: 58px;
-  border-radius: 62% 38% 58% 42% / 64% 50% 50% 36%;
-  background:
-    radial-gradient(circle at 26% 24%, rgba(255, 250, 231, 0.88), transparent 18%),
-    radial-gradient(circle at 74% 72%, rgba(182, 96, 20, 0.18), transparent 28%),
-    linear-gradient(145deg, #f7c970 0%, #eca442 46%, #d98226 100%);
-  box-shadow:
-    inset 0 -7px 0 rgba(156, 90, 18, 0.16),
-    inset 0 0 0 1px rgba(141, 83, 24, 0.12),
-    0 8px 18px rgba(115, 74, 35, 0.14);
-  transition: transform 200ms ease, filter 180ms ease;
+  width: 94px;
+  height: 62px;
+  transition: transform 220ms ease;
 }
 
-.fortune-cookie-shape::before,
-.fortune-cookie-shape::after {
+.fortune-cookie-paper {
+  position: absolute;
+  left: 50%;
+  top: 28px;
+  width: 58px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fffef8 0%, #f2eadc 100%);
+  box-shadow: inset 0 0 0 1px rgba(143, 127, 100, 0.12), 0 4px 10px rgba(79, 63, 39, 0.12);
+  transform: translateX(-50%) scaleX(0.18);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform 320ms cubic-bezier(.22,.61,.36,1), opacity 180ms ease;
+}
+
+.fortune-cookie-half {
+  position: absolute;
+  top: 8px;
+  width: 46px;
+  height: 42px;
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255, 250, 235, 0.9), transparent 20%),
+    radial-gradient(circle at 70% 76%, rgba(179, 96, 19, 0.22), transparent 24%),
+    linear-gradient(155deg, #f9d182 0%, #efb14f 52%, #d68427 100%);
+  box-shadow:
+    inset 0 -5px 0 rgba(165, 93, 21, 0.15),
+    inset 0 0 0 1px rgba(138, 78, 19, 0.11),
+    0 8px 18px rgba(104, 67, 30, 0.12);
+  transition: transform 320ms cubic-bezier(.22,.61,.36,1), filter 220ms ease;
+}
+
+.fortune-cookie-half::before,
+.fortune-cookie-half::after {
   content: "";
   position: absolute;
-  top: 6px;
-  width: 36px;
-  height: 46px;
-  background:
-    linear-gradient(160deg, #ffd684 0%, #efb257 56%, #d48229 100%);
-  border-radius: 58% 42% 60% 40%;
-  box-shadow: inset 0 0 0 1px rgba(132, 73, 18, 0.08);
-  transition: transform 280ms cubic-bezier(.22,.61,.36,1), opacity 180ms ease;
 }
 
-.fortune-cookie-shape::before {
-  left: 7px;
-  transform: rotate(27deg);
+.fortune-cookie-half::before {
+  inset: 6px 7px 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(157, 90, 27, 0.08);
+  opacity: 0.45;
 }
 
-.fortune-cookie-shape::after {
-  right: 7px;
-  transform: rotate(-27deg);
+.fortune-cookie-half::after {
+  top: 8px;
+  width: 14px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 243, 214, 0.28);
+  filter: blur(0.4px);
+}
+
+.fortune-cookie-half-left {
+  left: 8px;
+  border-radius: 65% 26% 62% 40% / 66% 36% 62% 34%;
+  transform: rotate(24deg);
+}
+
+.fortune-cookie-half-left::after {
+  left: 8px;
+  transform: rotate(-18deg);
+}
+
+.fortune-cookie-half-right {
+  right: 8px;
+  border-radius: 26% 65% 40% 62% / 36% 66% 34% 62%;
+  transform: rotate(-24deg);
+}
+
+.fortune-cookie-half-right::after {
+  right: 8px;
+  transform: rotate(18deg);
+}
+
+.fortune-cookie-crumb {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 10px;
+  height: 6px;
+  border-radius: 55% 45% 65% 35%;
+  background: linear-gradient(160deg, #f4c86f 0%, #d88b32 100%);
+  transform: translateX(-50%) scale(0.2);
+  opacity: 0;
+  transition: transform 280ms ease, opacity 160ms ease;
 }
 
 .fortune-cookie.is-crack-1 .fortune-cookie-shape {
@@ -193,38 +248,53 @@ h1 {
 }
 
 .fortune-cookie.is-crack-3 .fortune-cookie-shape::before {
-  transform: translateX(-4px) rotate(16deg);
+  transform: none;
 }
 
-.fortune-cookie.is-crack-3 .fortune-cookie-shape::after {
-  transform: translateX(4px) rotate(-16deg);
+.fortune-cookie.is-crack-3 .fortune-cookie-half-left {
+  transform: translateX(-2px) rotate(18deg);
 }
 
-.fortune-cookie.is-open .fortune-cookie-shape::before {
-  transform: translateX(-16px) translateY(2px) rotate(-28deg);
-}
-
-.fortune-cookie.is-open .fortune-cookie-shape::after {
-  transform: translateX(16px) translateY(2px) rotate(28deg);
+.fortune-cookie.is-crack-3 .fortune-cookie-half-right {
+  transform: translateX(2px) rotate(-18deg);
 }
 
 .fortune-cookie.is-open .fortune-cookie-shape {
-  transform: translateY(2px) scale(0.96);
+  transform: translateY(2px);
+}
+
+.fortune-cookie.is-open .fortune-cookie-paper {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1) translateY(0);
+}
+
+.fortune-cookie.is-open .fortune-cookie-half-left {
+  transform: translateX(-18px) translateY(2px) rotate(-18deg);
   filter: saturate(0.96);
 }
 
+.fortune-cookie.is-open .fortune-cookie-half-right {
+  transform: translateX(18px) translateY(2px) rotate(18deg);
+  filter: saturate(0.96);
+}
+
+.fortune-cookie.is-open .fortune-cookie-crumb {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
 .fortune-text {
-  max-width: 290px;
-  margin: -2px auto 0;
-  padding: 8px 14px 9px;
-  border-radius: 999px;
+  max-width: 268px;
+  margin: -1px auto 0;
+  padding: 9px 14px 10px;
+  border-radius: 16px;
   background: linear-gradient(180deg, #fffdf8 0%, #f6f0e5 100%);
   box-shadow: 0 10px 18px rgba(95, 79, 58, 0.12), inset 0 0 0 1px rgba(141, 120, 88, 0.1);
   font-family: "Caveat", cursive;
-  font-size: clamp(1.1rem, 3.8vw, 1.55rem);
+  font-size: clamp(1rem, 3.6vw, 1.42rem);
   line-height: 1.02;
   text-align: center;
-  transform: translateY(-8px);
+  transform: translateY(-10px);
   animation: paper-slide 360ms cubic-bezier(.22,.61,.36,1);
 }
 
@@ -246,11 +316,11 @@ h1 {
 @keyframes paper-slide {
   0% {
     opacity: 0;
-    transform: translateY(-16px) scale(0.96);
+    transform: translateY(-18px) scale(0.94);
   }
   100% {
     opacity: 1;
-    transform: translateY(-8px) scale(1);
+    transform: translateY(-10px) scale(1);
   }
 }
 
@@ -419,8 +489,8 @@ html[data-theme="dark"] .fortune-card {
 }
 
 html[data-theme="dark"] .fortune-text {
-  background: linear-gradient(180deg, #f4efe5 0%, #e7dcc8 100%);
-  color: #352920;
+  background: linear-gradient(180deg, #f5efe2 0%, #e6d9bf 100%);
+  color: #33271e;
 }
 
 html[data-theme="dark"] .note-input,
