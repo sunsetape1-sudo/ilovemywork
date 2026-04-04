@@ -312,10 +312,21 @@ html[data-theme="dark"] .note-history-item {
   margin-bottom: 4px;
 }
 
+.brush-picker-bottom {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
 .custom-tools {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+
+.custom-tools-standalone {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .custom-tools-heading {
@@ -623,6 +634,7 @@ html[data-theme="dark"] .custom-delete-button {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--text);
   text-align: center;
+  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
 }
 
 .day-cell.is-weekend {
@@ -651,6 +663,26 @@ html[data-theme="dark"] .custom-delete-button {
 
 .day-cell.is-today .day-number {
   color: var(--today);
+}
+
+.day-cell.has-custom-mark {
+  background: var(--custom-day-color);
+  color: var(--custom-day-text);
+  box-shadow: inset 0 0 0 1px rgba(31, 26, 47, 0.08);
+}
+
+.day-cell.has-custom-mark.is-weekend {
+  background: var(--custom-day-color);
+}
+
+.day-cell.has-custom-mark.is-today {
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.78),
+    0 0 0 3px rgba(125, 108, 199, 0.16);
+}
+
+.day-cell.has-custom-mark.is-today .day-number {
+  color: var(--custom-day-text);
 }
 
 .day-cell.is-selected {
@@ -721,24 +753,11 @@ html[data-theme="dark"] .custom-delete-button {
 .day-number {
   position: relative;
   z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.85rem;
-  height: 1.85rem;
-  padding: 0 0.28rem;
-  border-radius: 999px;
   font-family: "Caveat", cursive;
   font-size: 1.45rem;
   font-weight: 700;
   line-height: 1;
-  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
-}
-
-.day-cell.has-custom-mark .day-number {
-  background: var(--custom-day-color);
-  color: var(--custom-day-text);
-  box-shadow: 0 2px 10px rgba(31, 26, 47, 0.12);
+  transition: color 160ms ease;
 }
 
 .details-panel {
