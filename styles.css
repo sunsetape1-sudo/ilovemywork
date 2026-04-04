@@ -405,6 +405,10 @@ html[data-theme="dark"] .note-history-item {
   gap: 6px;
 }
 
+.custom-select-field {
+  position: relative;
+}
+
 .custom-field-label {
   color: var(--muted);
   font-size: 0.82rem;
@@ -434,8 +438,25 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-select-input {
   width: 100%;
-  padding: 0 14px;
+  padding: 0 42px 0 14px;
   appearance: none;
+  cursor: pointer;
+}
+
+.custom-select-field::after {
+  content: "▾";
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  font-size: 1rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.custom-select-note {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.2;
 }
 
 .custom-color-input::-webkit-color-swatch-wrapper {
