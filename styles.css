@@ -78,8 +78,8 @@ body::after {
   pointer-events: none;
   z-index: 0;
   background-repeat: no-repeat;
-  opacity: 0.22;
-  filter: blur(8px) saturate(0.9);
+  opacity: 0.18;
+  filter: saturate(0.88) contrast(0.96) brightness(1.01);
 }
 
 body::before {
@@ -96,8 +96,8 @@ body::after {
 
 html[data-theme="dark"] body::before,
 html[data-theme="dark"] body::after {
-  opacity: 0.16;
-  filter: blur(10px) saturate(0.82);
+  opacity: 0.14;
+  filter: saturate(0.74) contrast(0.92) brightness(0.94);
 }
 
 button,
