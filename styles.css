@@ -392,7 +392,7 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) 88px 180px 92px auto;
+  grid-template-columns: minmax(0, 1.6fr) 88px 180px auto;
   gap: 8px;
   align-items: end;
   margin-top: 12px;
@@ -400,8 +400,7 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-field,
 .custom-color-field,
-.custom-select-field,
-.custom-priority-field {
+.custom-select-field {
   display: grid;
   gap: 6px;
 }
@@ -414,8 +413,7 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-input,
 .custom-color-input,
-.custom-select-input,
-.custom-number-input {
+.custom-select-input {
   min-height: 46px;
   border: 0;
   border-radius: 16px;
@@ -434,8 +432,7 @@ html[data-theme="dark"] .note-history-item {
   padding: 6px;
 }
 
-.custom-select-input,
-.custom-number-input {
+.custom-select-input {
   width: 100%;
   padding: 0 14px;
   appearance: none;
@@ -1049,7 +1046,6 @@ html[data-theme="dark"] .day-cell.is-weekend.is-work {
 
   .custom-color-field,
   .custom-select-field,
-  .custom-priority-field,
   .custom-add-button {
     grid-column: 1 / -1;
   }

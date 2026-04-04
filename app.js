@@ -5,7 +5,6 @@ const PREDICTION_DATA_URL = "./predictions.json";
 const HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 const COUNTRY_CODE = "RU";
 const DEFAULT_CUSTOM_COLOR = "#7fa8ff";
-const DEFAULT_CUSTOM_PRIORITY = 50;
 const MAX_CUSTOM_PROCEDURES = 100;
 const REPEAT_MODE_SINGLE = "single_month";
 const REPEAT_MODE_CARRY = "carry_forward";
@@ -14,7 +13,6 @@ const LEGACY_MANICURE_PROCEDURE = {
   id: "legacy-manicure",
   name: "Маникюр",
   color: "#e493cb",
-  priority: DEFAULT_CUSTOM_PRIORITY,
   repeatMode: REPEAT_MODE_SINGLE,
   anchorMonthKey: null,
 };
@@ -59,7 +57,6 @@ const ui = {
   customProcedureName: document.querySelector("#customProcedureName"),
   customProcedureColor: document.querySelector("#customProcedureColor"),
   customProcedureRepeat: document.querySelector("#customProcedureRepeat"),
-  customProcedurePriority: document.querySelector("#customProcedurePriority"),
   customHint: document.querySelector("#customHint"),
   addCustomProcedureButton: document.querySelector("#addCustomProcedureButton"),
   deleteCustomProcedureButton: document.querySelector("#deleteCustomProcedureButton"),
@@ -420,9 +417,7 @@ function renderLegend() {
     { tone: "work", label: "Красный — смена" },
     { tone: "note", label: "Жёлтый — заметка" },
     { tone: "holiday", label: "Золотая звезда — праздник" },
-    ...getVisibleCustomProcedures()
-      .sort(compareProceduresByPriority)
-      .map((procedure) => ({
+    ...getVisibleCustomProcedures().map((procedure) => ({
       tone: "custom",
       label: `${capitalizeColorName(procedure.color)} — ${procedure.name}`,
       color: procedure.color,
@@ -584,7 +579,7 @@ function renderSelectedDay() {
 
 function renderCustomBrushes() {
   ui.customBrushList.innerHTML = "";
-  const procedures = getVisibleCustomProcedures().sort(compareProceduresByPriority);
+  const procedures = getVisibleCustomProcedures();
   ui.customBrushEmpty.hidden = Boolean(procedures.length);
 
   procedures.forEach((procedure) => {
@@ -603,7 +598,7 @@ function renderCustomBrushes() {
 
     const label = document.createElement("span");
     label.className = "custom-brush-label";
-    label.textContent = `${procedure.name} · ${getRepeatModeLabel(procedure.repeatMode)} · приоритет ${procedure.priority}`;
+    label.textContent = `${procedure.name} · ${getRepeatModeLabel(procedure.repeatMode)}`;
 
     button.append(swatch, label);
     ui.customBrushList.append(button);
@@ -861,7 +856,6 @@ function sanitizeCustomProcedures(procedures) {
           ? procedure.id.trim()
           : createStableProcedureId(name, index);
       const color = normalizeHexColor(procedure.color);
-      const priority = normalizeProcedurePriority(procedure.priority);
       const repeatMode = normalizeRepeatMode(procedure.repeatMode, name);
       const anchorMonthKey = normalizeMonthKey(procedure.anchorMonthKey);
 
@@ -875,7 +869,6 @@ function sanitizeCustomProcedures(procedures) {
         id,
         name,
         color,
-        priority,
         repeatMode,
         anchorMonthKey,
       };
@@ -1096,7 +1089,6 @@ function addOrUpdateCustomProcedure() {
 
   const color = normalizeHexColor(ui.customProcedureColor.value);
   const repeatMode = normalizeRepeatMode(ui.customProcedureRepeat.value, name);
-  const priority = normalizeProcedurePriority(ui.customProcedurePriority.value);
   const anchorMonthKey = formatMonthKey(viewDate);
   const existing = initialState.customProcedures.find(
     (procedure) =>
@@ -1123,7 +1115,6 @@ function addOrUpdateCustomProcedure() {
     id: createProcedureId(),
     name,
     color,
-    priority,
     repeatMode,
     anchorMonthKey,
   };
@@ -1132,7 +1123,6 @@ function addOrUpdateCustomProcedure() {
 
   ui.customProcedureName.value = "";
   ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
-  ui.customProcedurePriority.value = String(DEFAULT_CUSTOM_PRIORITY);
   ui.customProcedureRepeat.value = REPEAT_MODE_SINGLE;
   maybeNotifyBirthdayRule(procedure);
   persistState();
@@ -1162,7 +1152,6 @@ function deleteActiveCustomProcedure() {
   activeBrush = "work";
   ui.customProcedureName.value = "";
   ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
-  ui.customProcedurePriority.value = String(DEFAULT_CUSTOM_PRIORITY);
   ui.customProcedureRepeat.value = REPEAT_MODE_SINGLE;
   persistState();
   render();
@@ -1262,10 +1251,6 @@ function isProcedureVisibleInMonth(procedure, monthKey) {
   return monthKey === anchorMonthKey;
 }
 
-function compareProceduresByPriority(left, right) {
-  return right.priority - left.priority || left.name.localeCompare(right.name, "ru-RU");
-}
-
 function getRepeatModeLabel(repeatMode) {
   if (repeatMode === REPEAT_MODE_CARRY) {
     return "ежемесячно";
@@ -1284,15 +1269,6 @@ function normalizeRepeatMode(value, name = "") {
   }
 
   return [REPEAT_MODE_SINGLE, REPEAT_MODE_CARRY, REPEAT_MODE_BIRTHDAY].includes(value) ? value : REPEAT_MODE_SINGLE;
-}
-
-function normalizeProcedurePriority(value) {
-  const priority = Number.parseInt(value, 10);
-  if (!Number.isFinite(priority)) {
-    return DEFAULT_CUSTOM_PRIORITY;
-  }
-
-  return Math.min(100, Math.max(1, priority));
 }
 
 function normalizeMonthKey(value) {
@@ -1322,12 +1298,11 @@ function maybeNotifyBirthdayRule(procedure) {
 function getProceduresForDate(dateKey) {
   return getCustomEventInstancesForDate(dateKey)
     .map(({ procedure }) => procedure)
-    .filter(Boolean)
-    .sort(compareProceduresByPriority);
+    .filter(Boolean);
 }
 
 function getPrimaryProcedure(procedures) {
-  return procedures.slice().sort(compareProceduresByPriority)[0] || null;
+  return procedures[0] || null;
 }
 
 function getCustomEventInstancesForDate(dateKey) {
@@ -1345,8 +1320,7 @@ function getCustomEventInstancesForDate(dateKey) {
 
       return { event, procedure };
     })
-    .filter(Boolean)
-    .sort((left, right) => compareProceduresByPriority(left.procedure, right.procedure));
+    .filter(Boolean);
 }
 
 function getEventOccurrenceDateKey(event, targetDateKey) {
