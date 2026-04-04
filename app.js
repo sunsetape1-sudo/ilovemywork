@@ -23,7 +23,7 @@ const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const DAY_NAMES = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
 const PREDICTION_FALLBACK = [
   "Сегодня случится что-то небольшое, но очень приятное.",
-  "Сегодня удачное решение придёт спокойнее, чем ты ожидала.",
+  "Сегодня удачное решение придёт спокойнее, чем Вы ожидали.",
   "Этот день принесёт маленький знак, что всё складывается верно.",
   "Сегодня одна деталь неожиданно улучшит настроение.",
   "К вечеру день покажется теплее и добрее, чем утром.",
@@ -650,7 +650,7 @@ function renderNoteHistory() {
     emptyState.className = "holiday-empty";
     emptyState.textContent = "Пока нет сохранённых заметок.";
     ui.noteHistory.append(emptyState);
-    ui.noteHistorySubtitle.textContent = "Открой день, напиши заметку и сохрани её.";
+    ui.noteHistorySubtitle.textContent = "Откройте день, добавьте заметку и сохраните её.";
     return;
   }
 
@@ -1618,7 +1618,7 @@ async function importDataBackup(file) {
     window.location.reload();
   } catch (error) {
     console.error("Не удалось загрузить резервную копию", error);
-    window.alert("Не удалось загрузить файл. Проверь, что это JSON-резервная копия приложения.");
+    window.alert("Не удалось загрузить файл. Проверьте, что это JSON-резервная копия приложения.");
   }
 }
 
@@ -1741,7 +1741,7 @@ function loadFortuneState() {
       revealed: Boolean(parsed.revealed),
     });
   } catch (error) {
-    console.error("Не удалось прочитать состояние печеньки дня", error);
+    console.error("Не удалось прочитать состояние письма дня", error);
     return createDefaultFortuneState();
   }
 }
@@ -1803,7 +1803,7 @@ function openSecretFortuneReset() {
   dailyFortuneState = createDefaultFortuneState();
   persistFortuneState();
   renderQuote();
-  window.alert("Конверт дня снова закрыт. Можно проверить механику.");
+  window.alert("Конверт дня снова закрыт. Теперь можно проверить открытие.");
 }
 
 async function initializeQuote() {
