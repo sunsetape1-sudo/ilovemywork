@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#e7e0fb" id="themeColorMeta">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="I ❤️ MY WORK">
+    <title>I ❤️ MY WORK</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="icon" href="./favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero-card">
+        <h1>График смен</h1>
+        <blockquote class="quote-card" aria-live="polite">
+          <p class="quote-label">цитата дня</p>
+          <p class="quote-text" id="quoteText"></p>
+        </blockquote>
+      </section>
+
+      <section class="panel">
+        <div class="month-bar">
+          <button class="nav-button" id="prevMonthButton" type="button" aria-label="Предыдущий месяц">
+            ‹
+          </button>
+          <div class="month-copy">
+            <p class="month-label" id="monthLabel"></p>
+          </div>
+          <button class="nav-button" id="nextMonthButton" type="button" aria-label="Следующий месяц">
+            ›
+          </button>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar-actions">
+            <button class="secondary-button" id="todayButton" type="button">Сегодня</button>
+            <button class="theme-button" id="themeToggleButton" type="button">Тёмный режим</button>
+          </div>
+          <div class="legend-strip" id="legendStrip" aria-label="Обозначения"></div>
+        </div>
+
+        <div class="brush-picker" id="brushPicker" role="radiogroup" aria-label="Режим отметки">
+          <button class="brush-button" data-brush="work" type="button">Смена</button>
+          <button class="brush-button" data-brush="clear" type="button">Стереть</button>
+        </div>
+
+        <div class="custom-tools">
+          <div class="panel-heading custom-tools-heading">
+            <h2>Свои метки</h2>
+            <p>Можно добавить до 20 своих меток.</p>
+          </div>
+          <div class="custom-brushes" id="customBrushList" aria-label="Свои метки"></div>
+          <p class="custom-empty" id="customBrushEmpty">Пока нет своих меток.</p>
+          <div class="custom-form">
+            <label class="custom-field" for="customProcedureName">
+              <span class="custom-field-label">Название</span>
+              <input class="custom-input" id="customProcedureName" type="text" maxlength="32" placeholder="Например, стрижка сына">
+            </label>
+            <label class="custom-color-field" for="customProcedureColor">
+              <span class="custom-field-label">Цвет</span>
+              <input class="custom-color-input" id="customProcedureColor" type="color" value="#7fa8ff">
+            </label>
+            <button class="secondary-button custom-add-button" id="addCustomProcedureButton" type="button">Добавить</button>
+          </div>
+          <button class="custom-delete-button" id="deleteCustomProcedureButton" type="button" hidden>Удалить выбранную метку</button>
+        </div>
+
+      </section>
+
+      <section class="stats-grid" aria-label="Итоги месяца">
+        <article class="stat-card">
+          <span class="stat-label">Смен</span>
+          <strong class="stat-value" id="workCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Своих меток</span>
+          <strong class="stat-value" id="customCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Праздников</span>
+          <strong class="stat-value" id="holidayCount">0</strong>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="today-focus">
+          <p class="today-focus-label">Сегодня</p>
+          <p class="today-date-label today-date-prominent" id="todayDateLabel"></p>
+        </div>
+        <div class="weekdays" id="weekdayHeaders" aria-hidden="true"></div>
+        <div class="calendar-grid" id="calendarGrid" aria-label="Календарь месяца"></div>
+      </section>
+
+      <section class="panel details-panel" id="selectedDayPanel" aria-live="polite">
+        <p class="details-label">Выбранный день</p>
+        <h2 class="details-title" id="selectedDayTitle"></h2>
+        <div class="details-tags" id="selectedDayTags"></div>
+        <p class="details-copy" id="selectedDayCopy"></p>
+        <div class="note-editor">
+          <label class="note-label" for="noteInput">Заметка на день</label>
+          <textarea class="note-input" id="noteInput" rows="3" placeholder="Например: смена с 9 до 18, взять документы, позвонить..."></textarea>
+          <div class="note-actions">
+            <button class="secondary-button note-button" id="saveNoteButton" type="button">Сохранить заметку</button>
+            <button class="theme-button note-button" id="clearNoteButton" type="button">Удалить заметку</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel note-history-panel">
+        <div class="panel-heading">
+          <h2>История заметок</h2>
+          <p id="noteHistorySubtitle">Здесь будут заметки по дням.</p>
+        </div>
+        <div class="note-history" id="noteHistory"></div>
+      </section>
+
+      <section class="panel holiday-panel">
+        <div class="panel-heading">
+          <h2>Праздники месяца</h2>
+          <p id="holidayListSubtitle">Показываются официальные праздники по России.</p>
+        </div>
+        <div class="holiday-list" id="holidayList"></div>
+        <div class="status-banner holiday-status-banner" id="holidayStatus" aria-live="polite">
+          Загружаю праздники...
+        </div>
+      </section>
+
+      <div class="app-footer-meta">
+        <div class="backup-actions">
+          <button class="backup-button" id="exportDataButton" type="button">Сохранить данные</button>
+          <button class="backup-button" id="importDataButton" type="button">Загрузить данные</button>
+          <input id="importDataInput" type="file" accept="application/json" hidden>
+        </div>
+        <button class="refresh-button refresh-button-subtle" id="refreshAppButton" type="button">Обновить страницу</button>
+        <button class="reset-button reset-button-subtle" id="resetDataButton" type="button">Очистить кэш</button>
+        <p class="app-credit">Разработано для личного использования @altregor</p>
+      </div>
+    </main>
+  </body>
+</html>

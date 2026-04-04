@@ -1,0 +1,1492 @@
+const STORAGE_KEY = "shift-calendar-v1";
+const THEME_STORAGE_KEY = "shift-calendar-theme-v1";
+const LEGACY_QUOTE_STORAGE_KEY = "shift-calendar-last-quote-v1";
+const QUOTE_CYCLE_STORAGE_KEY = "shift-calendar-quote-cycle-v2";
+const QUOTE_DATA_URL = "./quotes.json";
+const HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays";
+const COUNTRY_CODE = "RU";
+const DEFAULT_CUSTOM_COLOR = "#7fa8ff";
+const MAX_CUSTOM_PROCEDURES = 20;
+const LEGACY_MANICURE_PROCEDURE = {
+  id: "legacy-manicure",
+  name: "Маникюр",
+  color: "#e493cb",
+};
+const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const DAY_NAMES = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+const QUOTE_FALLBACK = [
+  "Маленькие шаги каждый день дают большой результат.",
+  "Даже самый спокойный день может стать важным.",
+  "Ты не обязана делать всё сразу, достаточно делать по чуть-чуть.",
+  "Ритм тоже успех, не только скорость.",
+  "Хорошо сделанный обычный день уже многое значит.",
+  "Пусть сегодня будет просто хороший, ровный день.",
+  "Забота о себе тоже часть плана, а не пауза от него.",
+  "Стабильность часто красивее спешки.",
+  "Иногда лучший прогресс это просто не сдаваться.",
+  "Порядок в мелочах очень бережёт силы.",
+  "Один отмеченный день уже делает месяц понятнее.",
+  "Спокойный план помогает дышать свободнее.",
+];
+const MONTH_GENITIVE = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
+
+const ui = {
+  holidayStatus: document.querySelector("#holidayStatus"),
+  legendStrip: document.querySelector("#legendStrip"),
+  monthLabel: document.querySelector("#monthLabel"),
+  todayDateLabel: document.querySelector("#todayDateLabel"),
+  quoteText: document.querySelector("#quoteText"),
+  brushPicker: document.querySelector("#brushPicker"),
+  customBrushList: document.querySelector("#customBrushList"),
+  customBrushEmpty: document.querySelector("#customBrushEmpty"),
+  customProcedureName: document.querySelector("#customProcedureName"),
+  customProcedureColor: document.querySelector("#customProcedureColor"),
+  addCustomProcedureButton: document.querySelector("#addCustomProcedureButton"),
+  deleteCustomProcedureButton: document.querySelector("#deleteCustomProcedureButton"),
+  exportDataButton: document.querySelector("#exportDataButton"),
+  importDataButton: document.querySelector("#importDataButton"),
+  importDataInput: document.querySelector("#importDataInput"),
+  refreshAppButton: document.querySelector("#refreshAppButton"),
+  calendarGrid: document.querySelector("#calendarGrid"),
+  weekdayHeaders: document.querySelector("#weekdayHeaders"),
+  workCount: document.querySelector("#workCount"),
+  customCount: document.querySelector("#customCount"),
+  holidayCount: document.querySelector("#holidayCount"),
+  selectedDayTitle: document.querySelector("#selectedDayTitle"),
+  selectedDayTags: document.querySelector("#selectedDayTags"),
+  selectedDayCopy: document.querySelector("#selectedDayCopy"),
+  noteInput: document.querySelector("#noteInput"),
+  saveNoteButton: document.querySelector("#saveNoteButton"),
+  clearNoteButton: document.querySelector("#clearNoteButton"),
+  noteHistory: document.querySelector("#noteHistory"),
+  noteHistorySubtitle: document.querySelector("#noteHistorySubtitle"),
+  holidayList: document.querySelector("#holidayList"),
+  holidayListSubtitle: document.querySelector("#holidayListSubtitle"),
+  prevMonthButton: document.querySelector("#prevMonthButton"),
+  nextMonthButton: document.querySelector("#nextMonthButton"),
+  todayButton: document.querySelector("#todayButton"),
+  themeToggleButton: document.querySelector("#themeToggleButton"),
+  resetDataButton: document.querySelector("#resetDataButton"),
+  themeColorMeta: document.querySelector("#themeColorMeta"),
+};
+
+const initialState = loadState();
+const today = new Date();
+let activeBrush = normalizeBrushId(initialState.lastBrush);
+let viewDate = parseMonthKey(initialState.lastViewedMonth) || new Date(today.getFullYear(), today.getMonth(), 1);
+let selectedDateKey =
+  initialState.selectedDateKey || formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+const holidayCache = new Map(Object.entries(initialState.holidaysCache || {}));
+let theme = loadTheme();
+let currentQuote = "Подбираю новую цитату...";
+let quotePoolPromise = null;
+let holidayStatus = {
+  state: "loading",
+  message: "Загружаю праздники...",
+};
+
+applyTheme(theme);
+renderQuote();
+initializeQuote();
+renderWeekdays();
+bindEvents();
+renderBrushPicker();
+ensureMonthInView();
+render();
+loadHolidaysForYear(viewDate.getFullYear());
+registerServiceWorker();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return {
+        entries: {},
+        holidaysCache: {},
+        customProcedures: [],
+        lastViewedMonth: null,
+        lastBrush: "work",
+        selectedDateKey: null,
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+    const customProcedures = ensureLegacyManicureProcedure(
+      sanitizeCustomProcedures(parsed.customProcedures || []),
+      hasLegacyManicureEntries(parsed.entries || {})
+    );
+    return {
+      entries: sanitizeEntries(parsed.entries || {}, customProcedures),
+      holidaysCache: parsed.holidaysCache || {},
+      customProcedures,
+      lastViewedMonth: parsed.lastViewedMonth || null,
+      lastBrush: parsed.lastBrush || "work",
+      selectedDateKey: parsed.selectedDateKey || null,
+    };
+  } catch (error) {
+    console.error("Не удалось прочитать сохранённые данные", error);
+    return {
+      entries: {},
+      holidaysCache: {},
+      customProcedures: [],
+      lastViewedMonth: null,
+      lastBrush: "work",
+      selectedDateKey: null,
+    };
+  }
+}
+
+function persistState() {
+  const payload = {
+    entries: initialState.entries,
+    holidaysCache: Object.fromEntries(holidayCache.entries()),
+    customProcedures: initialState.customProcedures,
+    lastViewedMonth: formatMonthKey(viewDate),
+    lastBrush: activeBrush,
+    selectedDateKey,
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+}
+
+function bindEvents() {
+  ui.prevMonthButton.addEventListener("click", () => {
+    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+    selectedDateKey = formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    ensureMonthInView();
+    render();
+    loadHolidaysForYear(viewDate.getFullYear());
+  });
+
+  ui.nextMonthButton.addEventListener("click", () => {
+    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+    selectedDateKey = formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    ensureMonthInView();
+    render();
+    loadHolidaysForYear(viewDate.getFullYear());
+  });
+
+  ui.todayButton.addEventListener("click", () => {
+    viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    selectedDateKey = formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+    ensureMonthInView();
+    render();
+    loadHolidaysForYear(viewDate.getFullYear());
+  });
+
+  ui.themeToggleButton.addEventListener("click", () => {
+    theme = theme === "dark" ? "light" : "dark";
+    applyTheme(theme);
+    persistTheme();
+    render();
+  });
+
+  ui.resetDataButton.addEventListener("click", async () => {
+    const confirmed = window.confirm("Очистить все локальные данные на этом устройстве? Смены, заметки, тема и кэш будут удалены.");
+    if (!confirmed) {
+      return;
+    }
+
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_QUOTE_STORAGE_KEY);
+    localStorage.removeItem(QUOTE_CYCLE_STORAGE_KEY);
+
+    if ("caches" in window) {
+      const cacheKeys = await caches.keys();
+      await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+    }
+
+    window.location.reload();
+  });
+
+  ui.refreshAppButton.addEventListener("click", async () => {
+    await refreshApplicationPreservingData();
+  });
+
+  ui.exportDataButton.addEventListener("click", () => {
+    exportDataBackup();
+  });
+
+  ui.importDataButton.addEventListener("click", () => {
+    ui.importDataInput.click();
+  });
+
+  ui.importDataInput.addEventListener("change", async (event) => {
+    const [file] = event.target.files || [];
+    if (!file) {
+      return;
+    }
+
+    await importDataBackup(file);
+    ui.importDataInput.value = "";
+  });
+
+  ui.brushPicker.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-brush]");
+    if (!button) {
+      return;
+    }
+
+    setActiveBrush(button.dataset.brush);
+  });
+
+  ui.customBrushList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-brush]");
+    if (!button) {
+      return;
+    }
+
+    setActiveBrush(button.dataset.brush);
+  });
+
+  ui.addCustomProcedureButton.addEventListener("click", () => {
+    addOrUpdateCustomProcedure();
+  });
+
+  ui.deleteCustomProcedureButton.addEventListener("click", () => {
+    deleteActiveCustomProcedure();
+  });
+
+  ui.customProcedureName.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addOrUpdateCustomProcedure();
+    }
+  });
+
+  ui.calendarGrid.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-date]");
+    if (!button) {
+      return;
+    }
+
+    const dateKey = button.dataset.date;
+    selectedDateKey = dateKey;
+    const currentEntry = { ...(initialState.entries[dateKey] || {}) };
+
+    if (activeBrush === "clear") {
+      delete currentEntry.work;
+      delete currentEntry.manicure;
+      delete currentEntry.customMarks;
+      setEntry(dateKey, currentEntry);
+    } else if (isCustomBrushId(activeBrush)) {
+      const procedureId = activeBrush.replace("custom:", "");
+      const currentMarks = new Set(Array.isArray(currentEntry.customMarks) ? currentEntry.customMarks : []);
+      if (currentMarks.has(procedureId)) {
+        currentMarks.delete(procedureId);
+      } else {
+        currentMarks.add(procedureId);
+      }
+      currentEntry.customMarks = [...currentMarks];
+      setEntry(dateKey, currentEntry);
+    } else {
+      currentEntry[activeBrush] = !currentEntry[activeBrush];
+      setEntry(dateKey, currentEntry);
+    }
+
+    persistState();
+    render();
+  });
+
+  ui.saveNoteButton.addEventListener("click", () => {
+    const dateKey = selectedDateKey || formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    const noteText = ui.noteInput.value.trim();
+    const currentEntry = { ...(initialState.entries[dateKey] || {}) };
+
+    if (noteText) {
+      currentEntry.note = noteText;
+      currentEntry.noteUpdatedAt = new Date().toISOString();
+    } else {
+      delete currentEntry.note;
+      delete currentEntry.noteUpdatedAt;
+    }
+
+    setEntry(dateKey, currentEntry);
+    persistState();
+    render();
+  });
+
+  ui.clearNoteButton.addEventListener("click", () => {
+    const dateKey = selectedDateKey || formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    const currentEntry = { ...(initialState.entries[dateKey] || {}) };
+    delete currentEntry.note;
+    delete currentEntry.noteUpdatedAt;
+    setEntry(dateKey, currentEntry);
+    persistState();
+    render();
+  });
+
+  ui.noteHistory.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-history-date]");
+    if (!button) {
+      return;
+    }
+
+    const dateKey = button.dataset.historyDate;
+    selectedDateKey = dateKey;
+    const [year, month] = dateKey.split("-").map(Number);
+    viewDate = new Date(year, month - 1, 1);
+    ensureMonthInView();
+    render();
+    loadHolidaysForYear(viewDate.getFullYear());
+  });
+}
+
+function renderWeekdays() {
+  ui.weekdayHeaders.innerHTML = "";
+
+  WEEKDAYS.forEach((weekday, index) => {
+    const item = document.createElement("div");
+    item.className = "weekday";
+    if (index >= 5) {
+      item.classList.add("is-weekend");
+    }
+    item.textContent = weekday;
+    ui.weekdayHeaders.append(item);
+  });
+}
+
+function renderBrushPicker() {
+  ui.brushPicker.querySelectorAll("[data-brush]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.brush === activeBrush);
+  });
+}
+
+function render() {
+  renderTodayDate();
+  renderMonthHeading();
+  renderLegend();
+  renderBrushPicker();
+  renderCustomBrushes();
+  renderCustomProcedureFormState();
+  renderCalendar();
+  renderStats();
+  renderSelectedDay();
+  renderNoteHistory();
+  renderHolidayList();
+  renderHolidayStatus();
+  renderThemeToggle();
+  persistState();
+}
+
+function renderTodayDate() {
+  ui.todayDateLabel.textContent = formatTodayHeadline(today);
+}
+
+function renderLegend() {
+  ui.legendStrip.innerHTML = "";
+
+  const items = [
+    { tone: "work", label: "Красный — смена" },
+    { tone: "note", label: "Жёлтый — заметка" },
+    { tone: "holiday", label: "Золотой ромб — праздник" },
+    ...initialState.customProcedures.map((procedure) => ({
+      tone: "custom",
+      label: `${capitalizeColorName(procedure.color)} — ${procedure.name}`,
+      color: procedure.color,
+    })),
+  ];
+
+  items.forEach((item) => {
+    const element = document.createElement("span");
+    element.className = "legend-item";
+
+    const dot = document.createElement("span");
+    dot.className = `legend-dot ${item.tone}`.trim();
+    if (item.tone === "custom" && item.color) {
+      dot.style.setProperty("--legend-color", item.color);
+    }
+
+    const text = document.createElement("span");
+    text.textContent = item.label;
+
+    element.append(dot, text);
+    ui.legendStrip.append(element);
+  });
+}
+
+function renderQuote() {
+  ui.quoteText.textContent = currentQuote;
+}
+
+function renderMonthHeading() {
+  const formatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
+  const monthText = formatter.format(viewDate);
+  ui.monthLabel.textContent = monthText.charAt(0).toUpperCase() + monthText.slice(1);
+}
+
+function renderCalendar() {
+  ui.calendarGrid.innerHTML = "";
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstWeekdayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for (let index = 0; index < firstWeekdayOffset; index += 1) {
+    const filler = document.createElement("div");
+    filler.className = "day-empty";
+    ui.calendarGrid.append(filler);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const button = document.createElement("button");
+    const dayDate = new Date(year, month, day);
+    const dateKey = formatDateKey(year, month, day);
+    const entry = initialState.entries[dateKey] || {};
+    const customProcedures = getProceduresForEntry(entry);
+    const holiday = getHolidayByDate(dateKey);
+    const isToday = dateKey === formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+    const isSelected = dateKey === selectedDateKey;
+    const isWeekend = [0, 6].includes(dayDate.getDay());
+
+    button.type = "button";
+    button.className = "day-cell";
+    button.dataset.date = dateKey;
+    button.classList.toggle("is-work", Boolean(entry.work));
+    button.classList.toggle("is-note", Boolean(entry.note));
+    button.classList.toggle("is-weekend", isWeekend);
+    button.classList.toggle("is-holiday", Boolean(holiday));
+    button.classList.toggle("is-today", isToday);
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+    button.setAttribute(
+      "aria-label",
+      buildDayAriaLabel({
+        day,
+        month,
+        year,
+        isWork: Boolean(entry.work),
+        isNote: Boolean(entry.note),
+        customProcedureNames: customProcedures.map((procedure) => procedure.name),
+        holiday,
+        isWeekend,
+        isToday,
+      })
+    );
+
+    const marker = document.createElement("span");
+    marker.className = "day-marker";
+    customProcedures.forEach((procedure, index) => {
+      const ring = document.createElement("span");
+      ring.className = "custom-ring";
+      ring.setAttribute("aria-hidden", "true");
+      ring.style.setProperty("--ring-color", procedure.color);
+      ring.style.setProperty("--ring-inset", `${5 + index * 4}px`);
+      ring.style.setProperty("--ring-rotation", `${index % 2 === 0 ? -13 - index * 2 : 11 + index * 2}deg`);
+      marker.append(ring);
+    });
+    const number = document.createElement("span");
+    number.className = "day-number";
+    number.textContent = String(day);
+    marker.append(number);
+    button.append(marker);
+    ui.calendarGrid.append(button);
+  }
+}
+
+function renderStats() {
+  const monthPrefix = formatMonthPrefix(viewDate.getFullYear(), viewDate.getMonth());
+  const workCount = Object.entries(initialState.entries).filter(
+    ([dateKey, value]) => dateKey.startsWith(monthPrefix) && value.work
+  ).length;
+  const customCount = Object.entries(initialState.entries)
+    .filter(([dateKey]) => dateKey.startsWith(monthPrefix))
+    .reduce((total, [, value]) => total + (Array.isArray(value.customMarks) ? value.customMarks.length : 0), 0);
+  const holidayCount = getCurrentMonthHolidays().length;
+
+  ui.workCount.textContent = String(workCount);
+  ui.customCount.textContent = String(customCount);
+  ui.holidayCount.textContent = String(holidayCount);
+}
+
+function renderSelectedDay() {
+  const fallbackKey = formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const dateKey = selectedDateKey || fallbackKey;
+  const [year, monthNumber, dayNumber] = dateKey.split("-").map(Number);
+  const month = monthNumber - 1;
+  const currentDate = new Date(year, month, dayNumber);
+  const entry = initialState.entries[dateKey] || {};
+  const customProcedures = getProceduresForEntry(entry);
+  const holiday = getHolidayByDate(dateKey);
+  const isToday = dateKey === formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+
+  ui.selectedDayTitle.textContent = `${dayNumber} ${MONTH_GENITIVE[month]}, ${DAY_NAMES[currentDate.getDay()]}`;
+  ui.selectedDayTags.innerHTML = "";
+
+  const tags = [];
+  if (entry.work) tags.push({ label: "Смена", tone: "work" });
+  customProcedures.forEach((procedure) => {
+    tags.push({ label: procedure.name, tone: "custom", color: procedure.color });
+  });
+  if (!entry.work && !customProcedures.length) tags.push({ label: "Без метки", tone: "" });
+  if (entry.note) tags.push({ label: "Есть заметка", tone: "note" });
+  if (holiday) tags.push({ label: "Праздник", tone: "holiday" });
+  if (isToday) tags.push({ label: "Сегодня", tone: "today" });
+
+  tags.forEach((tag) => {
+    const element = document.createElement("span");
+    element.className = `tag ${tag.tone}`.trim();
+    element.textContent = tag.label;
+    if (tag.tone === "custom" && tag.color) {
+      element.style.setProperty("--tag-color", tag.color);
+      element.style.setProperty("--tag-soft", withAlpha(tag.color, theme === "dark" ? 0.24 : 0.16));
+      element.style.setProperty("--tag-line", withAlpha(tag.color, theme === "dark" ? 0.38 : 0.3));
+    }
+    ui.selectedDayTags.append(element);
+  });
+
+  ui.selectedDayCopy.textContent = buildSelectedDayCopy(entry, customProcedures, holiday);
+
+  ui.noteInput.value = entry.note || "";
+  ui.clearNoteButton.disabled = !entry.note;
+}
+
+function renderCustomBrushes() {
+  ui.customBrushList.innerHTML = "";
+  const procedures = initialState.customProcedures;
+  ui.customBrushEmpty.hidden = Boolean(procedures.length);
+
+  procedures.forEach((procedure) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "custom-brush-button";
+    button.dataset.brush = `custom:${procedure.id}`;
+    button.style.setProperty("--custom-color", procedure.color);
+    button.style.setProperty("--custom-soft", withAlpha(procedure.color, theme === "dark" ? 0.24 : 0.16));
+    button.style.setProperty("--custom-line", withAlpha(procedure.color, theme === "dark" ? 0.44 : 0.26));
+    button.classList.toggle("is-active", button.dataset.brush === activeBrush);
+
+    const swatch = document.createElement("span");
+    swatch.className = "custom-brush-swatch";
+    swatch.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.className = "custom-brush-label";
+    label.textContent = procedure.name;
+
+    button.append(swatch, label);
+    ui.customBrushList.append(button);
+  });
+}
+
+function renderNoteHistory() {
+  const noteItems = Object.entries(initialState.entries)
+    .filter(([, value]) => value.note)
+    .sort((a, b) => {
+      const aTime = a[1].noteUpdatedAt || "";
+      const bTime = b[1].noteUpdatedAt || "";
+      return bTime.localeCompare(aTime);
+    });
+
+  ui.noteHistory.innerHTML = "";
+
+  if (!noteItems.length) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "holiday-empty";
+    emptyState.textContent = "Пока нет сохранённых заметок.";
+    ui.noteHistory.append(emptyState);
+    ui.noteHistorySubtitle.textContent = "Открой день, напиши заметку и сохрани её.";
+    return;
+  }
+
+  ui.noteHistorySubtitle.textContent = `Сохранено ${noteItems.length} ${pluralize(noteItems.length, ["заметка", "заметки", "заметок"])}.`;
+
+  noteItems.forEach(([dateKey, value]) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "note-history-item";
+    item.dataset.historyDate = dateKey;
+
+    const title = document.createElement("span");
+    title.className = "note-history-date";
+    title.textContent = formatHumanDate(dateKey);
+
+    const text = document.createElement("span");
+    text.className = "note-history-text";
+    text.textContent = value.note;
+
+    item.append(title, text);
+    ui.noteHistory.append(item);
+  });
+}
+
+function renderHolidayList() {
+  const holidays = getCurrentMonthHolidays();
+  ui.holidayList.innerHTML = "";
+
+  if (holidayStatus.state === "loading" && !holidays.length) {
+    const loadingState = document.createElement("div");
+    loadingState.className = "holiday-empty";
+    loadingState.textContent = "Загружаю праздники для этого месяца...";
+    ui.holidayList.append(loadingState);
+    ui.holidayListSubtitle.textContent = "Список появится автоматически, как только придут данные.";
+    return;
+  }
+
+  if (!holidays.length) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "holiday-empty";
+    emptyState.textContent = "В этом месяце официальных праздников не найдено.";
+    ui.holidayList.append(emptyState);
+    ui.holidayListSubtitle.textContent = "Список загружается автоматически из открытого бесплатного API.";
+    return;
+  }
+
+  ui.holidayListSubtitle.textContent = `Найдено ${holidays.length} ${pluralize(holidays.length, ["праздник", "праздника", "праздников"])}.`;
+
+  holidays.forEach((holiday) => {
+    const card = document.createElement("article");
+    card.className = "holiday-item";
+
+    const date = document.createElement("span");
+    date.className = "holiday-date";
+    date.textContent = formatHumanDate(holiday.date);
+
+    const name = document.createElement("span");
+    name.className = "holiday-name";
+    name.textContent = holiday.localName || holiday.name;
+
+    card.append(date, name);
+    ui.holidayList.append(card);
+  });
+}
+
+function renderHolidayStatus() {
+  ui.holidayStatus.textContent = holidayStatus.message;
+  ui.holidayStatus.classList.remove("is-success", "is-warning");
+
+  if (holidayStatus.state === "success") {
+    ui.holidayStatus.classList.add("is-success");
+  }
+
+  if (holidayStatus.state === "warning") {
+    ui.holidayStatus.classList.add("is-warning");
+  }
+}
+
+async function loadHolidaysForYear(year) {
+  const cacheKey = `${COUNTRY_CODE}:${year}`;
+
+  if (holidayCache.has(cacheKey)) {
+    holidayStatus = {
+      state: "success",
+      message: `Праздники на ${year} год уже загружены и доступны даже без интернета.`,
+    };
+    render();
+    return;
+  }
+
+  holidayStatus = {
+    state: "loading",
+    message: `Загружаю официальные праздники на ${year} год...`,
+  };
+  renderHolidayStatus();
+
+  try {
+    const response = await fetch(`${HOLIDAY_API_BASE}/${year}/${COUNTRY_CODE}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const holidays = await response.json();
+    holidayCache.set(cacheKey, holidays);
+    holidayStatus = {
+      state: "success",
+      message: `Праздники на ${year} год успешно загружены.`,
+    };
+  } catch (error) {
+    console.error("Не удалось загрузить праздники", error);
+    holidayStatus = {
+      state: "warning",
+      message: holidayCache.size
+        ? "Интернет недоступен. Показываю ранее сохранённые праздники."
+        : "Не удалось загрузить праздники. Календарь и отметки всё равно продолжают работать.",
+    };
+  }
+
+  render();
+}
+
+function getHolidayByDate(dateKey) {
+  const cacheKey = `${COUNTRY_CODE}:${viewDate.getFullYear()}`;
+  const yearHolidays = holidayCache.get(cacheKey) || [];
+  return yearHolidays.find((holiday) => holiday.date === dateKey);
+}
+
+function getCurrentMonthHolidays() {
+  const cacheKey = `${COUNTRY_CODE}:${viewDate.getFullYear()}`;
+  const monthPrefix = formatMonthPrefix(viewDate.getFullYear(), viewDate.getMonth());
+  const yearHolidays = holidayCache.get(cacheKey) || [];
+  return yearHolidays.filter((holiday) => holiday.date.startsWith(monthPrefix));
+}
+
+function buildDayAriaLabel({
+  day,
+  month,
+  year,
+  isWork,
+  isNote,
+  customProcedureNames = [],
+  holiday,
+  isWeekend,
+  isToday,
+}) {
+  const parts = [`${day} ${MONTH_GENITIVE[month]} ${year} года`];
+
+  if (isWork) {
+    parts.push("смена");
+  }
+
+  if (customProcedureNames.length) {
+    parts.push(`метки: ${customProcedureNames.join(", ")}`);
+  }
+
+  if (!isWork && !customProcedureNames.length) {
+    parts.push(isWeekend ? "день без смены, выходной день недели" : "день без смены");
+  }
+
+  if (isNote) {
+    parts.push("есть заметка");
+  }
+
+  if (holiday) {
+    parts.push(`официальный праздник ${holiday.localName || holiday.name}`);
+  }
+
+  if (isToday) {
+    parts.push("сегодня");
+  }
+
+  return parts.join(", ");
+}
+
+function sanitizeEntries(entries, customProcedures = []) {
+  const validCustomIds = new Set(customProcedures.map((procedure) => procedure.id));
+  const legacyManicureId = getLegacyManicureProcedureId(customProcedures);
+  return Object.fromEntries(
+    Object.entries(entries)
+      .map(([dateKey, value]) => {
+        const normalized = sanitizeEntryValue(value, validCustomIds, legacyManicureId);
+        return normalized ? [dateKey, normalized] : null;
+      })
+      .filter(Boolean)
+  );
+}
+
+function sanitizeEntryValue(value, validCustomIds, legacyManicureId = null) {
+  if (value === "work") {
+    return { work: true };
+  }
+
+  if (value === "nails" || value === "manicure") {
+    return legacyManicureId ? { customMarks: [legacyManicureId] } : null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const normalized = {};
+
+  if (value.work) {
+    normalized.work = true;
+  }
+
+  const customMarks = new Set(Array.isArray(value.customMarks) ? value.customMarks.filter((item) => validCustomIds.has(item)) : []);
+  if (legacyManicureId && (value.nails || value.manicure)) {
+    customMarks.add(legacyManicureId);
+  }
+
+  if (customMarks.size) {
+    normalized.customMarks = [...customMarks];
+  }
+
+  if (typeof value.note === "string" && value.note.trim()) {
+    normalized.note = value.note.trim();
+  }
+
+  if (normalized.note && typeof value.noteUpdatedAt === "string") {
+    normalized.noteUpdatedAt = value.noteUpdatedAt;
+  }
+
+  return Object.keys(normalized).length ? normalized : null;
+}
+
+function sanitizeCustomProcedures(procedures) {
+  if (!Array.isArray(procedures)) {
+    return [];
+  }
+
+  const seenIds = new Set();
+  const seenNames = new Set();
+
+  return procedures
+    .map((procedure, index) => {
+      if (!procedure || typeof procedure !== "object") {
+        return null;
+      }
+
+      const name = normalizeProcedureName(procedure.name);
+      if (!name) {
+        return null;
+      }
+
+      const normalizedNameKey = normalizeProcedureKey(name);
+      const id =
+        typeof procedure.id === "string" && procedure.id.trim()
+          ? procedure.id.trim()
+          : createStableProcedureId(name, index);
+      const color = normalizeHexColor(procedure.color);
+
+      if (seenIds.has(id) || seenNames.has(normalizedNameKey)) {
+        return null;
+      }
+
+      seenIds.add(id);
+      seenNames.add(normalizedNameKey);
+
+      return {
+        id,
+        name,
+        color,
+      };
+    })
+    .filter(Boolean);
+}
+
+function hasLegacyManicureEntries(entries) {
+  return Object.values(entries).some((value) => {
+    if (value === "nails" || value === "manicure") {
+      return true;
+    }
+
+    return Boolean(value && typeof value === "object" && (value.nails || value.manicure));
+  });
+}
+
+function ensureLegacyManicureProcedure(procedures, shouldAdd) {
+  if (!shouldAdd) {
+    return procedures;
+  }
+
+  const existing = procedures.find(
+    (procedure) =>
+      procedure.id === LEGACY_MANICURE_PROCEDURE.id ||
+      normalizeProcedureKey(procedure.name) === normalizeProcedureKey(LEGACY_MANICURE_PROCEDURE.name)
+  );
+
+  if (existing) {
+    if (!existing.color) {
+      existing.color = LEGACY_MANICURE_PROCEDURE.color;
+    }
+    return procedures;
+  }
+
+  return [LEGACY_MANICURE_PROCEDURE, ...procedures];
+}
+
+function normalizeBrushId(brushId) {
+  if (brushId === "nails" || brushId === "manicure") {
+    const legacyProcedure = getLegacyManicureProcedure();
+    return legacyProcedure ? `custom:${legacyProcedure.id}` : "work";
+  }
+
+  if (["work", "clear"].includes(brushId)) {
+    return brushId;
+  }
+
+  if (isCustomBrushId(brushId)) {
+    const procedureId = brushId.replace("custom:", "");
+    if (getProcedureById(procedureId)) {
+      return brushId;
+    }
+  }
+
+  return "work";
+}
+
+function isCustomBrushId(value) {
+  return typeof value === "string" && value.startsWith("custom:");
+}
+
+function setActiveBrush(brushId) {
+  activeBrush = normalizeBrushId(brushId);
+  renderBrushPicker();
+  renderCustomBrushes();
+  renderCustomProcedureFormState();
+  persistState();
+}
+
+function addOrUpdateCustomProcedure() {
+  const name = normalizeProcedureName(ui.customProcedureName.value);
+  if (!name) {
+    ui.customProcedureName.focus();
+    return;
+  }
+
+  const color = normalizeHexColor(ui.customProcedureColor.value);
+  const existing = initialState.customProcedures.find(
+    (procedure) => normalizeProcedureKey(procedure.name) === normalizeProcedureKey(name)
+  );
+
+  if (existing) {
+    activeBrush = `custom:${existing.id}`;
+    ui.customProcedureName.value = "";
+    ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
+    persistState();
+    render();
+    return;
+  }
+
+  if (initialState.customProcedures.length >= MAX_CUSTOM_PROCEDURES) {
+    window.alert(`Можно сохранить до ${MAX_CUSTOM_PROCEDURES} своих меток.`);
+    return;
+  }
+
+  const procedure = {
+    id: createProcedureId(),
+    name,
+    color,
+  };
+  initialState.customProcedures.push(procedure);
+  activeBrush = `custom:${procedure.id}`;
+
+  ui.customProcedureName.value = "";
+  ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
+  persistState();
+  render();
+}
+
+function deleteActiveCustomProcedure() {
+  const activeProcedure = getActiveCustomProcedure();
+  if (!activeProcedure) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Удалить метку «${activeProcedure.name}» и убрать её отметки из календаря?`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  initialState.customProcedures = initialState.customProcedures.filter(
+    (procedure) => procedure.id !== activeProcedure.id
+  );
+
+  Object.entries(initialState.entries).forEach(([dateKey, entry]) => {
+    if (!Array.isArray(entry.customMarks) || !entry.customMarks.includes(activeProcedure.id)) {
+      return;
+    }
+
+    const nextEntry = { ...entry, customMarks: entry.customMarks.filter((mark) => mark !== activeProcedure.id) };
+    setEntry(dateKey, nextEntry);
+  });
+
+  activeBrush = "work";
+  ui.customProcedureName.value = "";
+  ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
+  persistState();
+  render();
+}
+
+function createProcedureId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+
+  return `proc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createStableProcedureId(name, index) {
+  return `proc-${hashString(`${name}-${index}`)}`;
+}
+
+function hashString(value) {
+  let hash = 0;
+
+  for (const char of value) {
+    hash = (hash << 5) - hash + char.charCodeAt(0);
+    hash |= 0;
+  }
+
+  return Math.abs(hash).toString(36);
+}
+
+function normalizeProcedureName(value) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function normalizeProcedureKey(value) {
+  return normalizeProcedureName(value).toLocaleLowerCase("ru-RU");
+}
+
+function normalizeHexColor(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : DEFAULT_CUSTOM_COLOR;
+}
+
+function getValidCustomProcedureIds() {
+  return new Set(initialState.customProcedures.map((procedure) => procedure.id));
+}
+
+function setEntry(dateKey, entry) {
+  const normalized = sanitizeEntryValue(entry, getValidCustomProcedureIds(), getLegacyManicureProcedureId());
+  if (normalized) {
+    initialState.entries[dateKey] = normalized;
+  } else {
+    delete initialState.entries[dateKey];
+  }
+}
+
+function getProcedureById(procedureId) {
+  return initialState.customProcedures.find((procedure) => procedure.id === procedureId) || null;
+}
+
+function getLegacyManicureProcedureId(customProcedures = initialState.customProcedures) {
+  const procedure = customProcedures.find(
+    (item) =>
+      item.id === LEGACY_MANICURE_PROCEDURE.id ||
+      normalizeProcedureKey(item.name) === normalizeProcedureKey(LEGACY_MANICURE_PROCEDURE.name)
+  );
+  return procedure ? procedure.id : null;
+}
+
+function getLegacyManicureProcedure() {
+  const legacyId = getLegacyManicureProcedureId();
+  return legacyId ? getProcedureById(legacyId) : null;
+}
+
+function getActiveCustomProcedure() {
+  return isCustomBrushId(activeBrush) ? getProcedureById(activeBrush.replace("custom:", "")) : null;
+}
+
+function renderCustomProcedureFormState() {
+  const activeProcedure = getActiveCustomProcedure();
+  if (!ui.customProcedureName.value.trim()) {
+    ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
+  }
+
+  ui.addCustomProcedureButton.textContent = "Добавить метку";
+  ui.addCustomProcedureButton.disabled = initialState.customProcedures.length >= MAX_CUSTOM_PROCEDURES;
+  ui.addCustomProcedureButton.title =
+    initialState.customProcedures.length >= MAX_CUSTOM_PROCEDURES
+      ? `Достигнут предел: ${MAX_CUSTOM_PROCEDURES} меток`
+      : "";
+  ui.customBrushEmpty.textContent = initialState.customProcedures.length
+    ? ""
+    : `Пока нет своих меток. Можно добавить до ${MAX_CUSTOM_PROCEDURES}.`;
+  ui.deleteCustomProcedureButton.textContent = activeProcedure
+    ? `Удалить метку «${activeProcedure.name}»`
+    : "Удалить выбранную метку";
+  ui.deleteCustomProcedureButton.hidden = !activeProcedure;
+}
+
+async function refreshApplicationPreservingData() {
+  ui.refreshAppButton.disabled = true;
+  ui.refreshAppButton.textContent = "Обновляю...";
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update()));
+    }
+
+    if ("caches" in window) {
+      const cacheKeys = await caches.keys();
+      await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+    }
+  } catch (error) {
+    console.error("Не удалось полностью обновить приложение", error);
+  }
+
+  window.location.reload();
+}
+
+function exportDataBackup() {
+  const payload = {
+    app: "I LOVE MY WORK",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    storageKey: STORAGE_KEY,
+    themeKey: THEME_STORAGE_KEY,
+    state: {
+      entries: initialState.entries,
+      holidaysCache: Object.fromEntries(holidayCache.entries()),
+      customProcedures: initialState.customProcedures,
+      lastViewedMonth: formatMonthKey(viewDate),
+      lastBrush: activeBrush,
+      selectedDateKey,
+    },
+    theme,
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `i-love-my-work-backup-${dateStamp}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importDataBackup(file) {
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+
+    if (!payload || typeof payload !== "object" || !payload.state || typeof payload.state !== "object") {
+      throw new Error("Некорректный файл");
+    }
+
+    const confirmed = window.confirm(
+      "Загрузить этот файл и заменить текущие локальные данные на этом устройстве?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const customProcedures = ensureLegacyManicureProcedure(
+      sanitizeCustomProcedures(payload.state.customProcedures || []),
+      hasLegacyManicureEntries(payload.state.entries || {})
+    );
+
+    const restoredState = {
+      entries: sanitizeEntries(payload.state.entries || {}, customProcedures),
+      holidaysCache: payload.state.holidaysCache || {},
+      customProcedures,
+      lastViewedMonth: payload.state.lastViewedMonth || null,
+      lastBrush: payload.state.lastBrush || "work",
+      selectedDateKey: payload.state.selectedDateKey || null,
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(restoredState));
+
+    if (payload.theme === "light" || payload.theme === "dark") {
+      localStorage.setItem(THEME_STORAGE_KEY, payload.theme);
+    }
+
+    window.location.reload();
+  } catch (error) {
+    console.error("Не удалось загрузить резервную копию", error);
+    window.alert("Не удалось загрузить файл. Проверь, что это JSON-резервная копия приложения.");
+  }
+}
+
+function getProceduresForEntry(entry) {
+  if (!entry || !Array.isArray(entry.customMarks)) {
+    return [];
+  }
+
+  return entry.customMarks.map((procedureId) => getProcedureById(procedureId)).filter(Boolean);
+}
+
+function buildSelectedDayCopy(entry, customProcedures, holiday) {
+  const parts = [];
+  const marks = [];
+
+  if (entry.work) {
+    marks.push("смена");
+  }
+
+  if (customProcedures.length) {
+    marks.push(...customProcedures.map((procedure) => procedure.name));
+  }
+
+  if (marks.length) {
+    parts.push(`Отметки на день: ${marks.join(", ")}.`);
+  } else {
+    parts.push("Этот день без отметок.");
+  }
+
+  if (entry.note) {
+    parts.push("Есть сохранённая заметка.");
+  }
+
+  if (holiday) {
+    parts.push(`Официальный праздник: ${holiday.localName || holiday.name}.`);
+  }
+
+  return parts.join(" ");
+}
+
+function withAlpha(color, alpha) {
+  const hex = normalizeHexColor(color).replace("#", "");
+  const channels = [0, 2, 4].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
+  return `rgba(${channels.join(", ")}, ${alpha})`;
+}
+
+function capitalizeColorName(color) {
+  const name = getColorName(color);
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function getColorName(color) {
+  const hex = normalizeHexColor(color).replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
+  const { h, s, l } = rgbToHsl(r, g, b);
+
+  if (s < 0.1) {
+    if (l > 0.88) return "белый";
+    if (l < 0.24) return "чёрный";
+    return "серый";
+  }
+
+  if (h < 15 || h >= 345) return "красный";
+  if (h < 40) return "оранжевый";
+  if (h < 58) return "золотой";
+  if (h < 70) return "жёлтый";
+  if (h < 150) return "зелёный";
+  if (h < 185) return "бирюзовый";
+  if (h < 220) return "голубой";
+  if (h < 255) return "синий";
+  if (h < 290) return "фиолетовый";
+  if (h < 335) return l > 0.68 ? "розовый" : "малиновый";
+  return "розовый";
+}
+
+function rgbToHsl(r, g, b) {
+  const red = r / 255;
+  const green = g / 255;
+  const blue = b / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  let hue = 0;
+  let saturation = 0;
+
+  if (max !== min) {
+    const delta = max - min;
+    saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+
+    switch (max) {
+      case red:
+        hue = (green - blue) / delta + (green < blue ? 6 : 0);
+        break;
+      case green:
+        hue = (blue - red) / delta + 2;
+        break;
+      default:
+        hue = (red - green) / delta + 4;
+        break;
+    }
+
+    hue *= 60;
+  }
+
+  return { h: hue, s: saturation, l: lightness };
+}
+
+function loadTheme() {
+  const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "dark" || storedTheme === "light") {
+    return storedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function persistTheme() {
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
+function applyTheme(nextTheme) {
+  document.documentElement.dataset.theme = nextTheme;
+  if (ui.themeColorMeta) {
+    ui.themeColorMeta.setAttribute("content", nextTheme === "dark" ? "#1a1724" : "#e7e0fb");
+  }
+}
+
+function renderThemeToggle() {
+  ui.themeToggleButton.textContent = theme === "dark" ? "Светлый режим" : "Тёмный режим";
+}
+
+async function initializeQuote() {
+  try {
+    const quotes = await loadQuotePool();
+    currentQuote = getNextQuote(quotes);
+  } catch (error) {
+    console.error("Не удалось подготовить новую цитату", error);
+    currentQuote = getNextQuote(QUOTE_FALLBACK);
+  }
+
+  renderQuote();
+}
+
+async function loadQuotePool() {
+  if (!quotePoolPromise) {
+    quotePoolPromise = fetch(QUOTE_DATA_URL)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        return response.json();
+      })
+      .then((payload) => sanitizeQuotePool(payload));
+  }
+
+  return quotePoolPromise;
+}
+
+function sanitizeQuotePool(payload) {
+  const quotes = Array.isArray(payload) ? payload.map(normalizeQuote).filter(Boolean) : [];
+  const uniqueQuotes = [...new Set(quotes)];
+  return uniqueQuotes.length ? uniqueQuotes : QUOTE_FALLBACK;
+}
+
+function normalizeQuote(value) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function loadQuoteCycleState() {
+  try {
+    const raw = localStorage.getItem(QUOTE_CYCLE_STORAGE_KEY);
+    if (!raw) {
+      return { poolSize: 0, lastIndex: -1, remaining: [] };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      poolSize: Number.isInteger(parsed.poolSize) ? parsed.poolSize : 0,
+      lastIndex: Number.isInteger(parsed.lastIndex) ? parsed.lastIndex : -1,
+      remaining: Array.isArray(parsed.remaining) ? parsed.remaining : [],
+    };
+  } catch (error) {
+    console.error("Не удалось прочитать очередь цитат", error);
+    return { poolSize: 0, lastIndex: -1, remaining: [] };
+  }
+}
+
+function persistQuoteCycleState(state) {
+  localStorage.setItem(QUOTE_CYCLE_STORAGE_KEY, JSON.stringify(state));
+}
+
+function getNextQuote(pool) {
+  const quotes = sanitizeQuotePool(pool);
+  const storedState = loadQuoteCycleState();
+  const isValidIndex = (value) => Number.isInteger(value) && value >= 0 && value < quotes.length;
+
+  let remaining =
+    storedState.poolSize === quotes.length
+      ? storedState.remaining.filter(isValidIndex)
+      : [];
+
+  if (!remaining.length) {
+    remaining = shuffleIndices(quotes.length);
+  }
+
+  if (remaining.length > 1 && remaining[0] === storedState.lastIndex) {
+    [remaining[0], remaining[1]] = [remaining[1], remaining[0]];
+  }
+
+  const nextIndex = remaining.shift() ?? 0;
+  persistQuoteCycleState({
+    poolSize: quotes.length,
+    lastIndex: nextIndex,
+    remaining,
+  });
+
+  return quotes[nextIndex];
+}
+
+function shuffleIndices(length) {
+  const indices = Array.from({ length }, (_, index) => index);
+
+  for (let index = indices.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [indices[index], indices[randomIndex]] = [indices[randomIndex], indices[index]];
+  }
+
+  return indices;
+}
+
+function ensureMonthInView() {
+  const [year, month] = selectedDateKey.split("-").map(Number);
+  if (year !== viewDate.getFullYear() || month - 1 !== viewDate.getMonth()) {
+    selectedDateKey = formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  }
+}
+
+function parseMonthKey(value) {
+  if (!value) {
+    return null;
+  }
+
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) {
+    return null;
+  }
+
+  return new Date(year, month - 1, 1);
+}
+
+function formatMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthPrefix(year, monthIndex) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+}
+
+function formatDateKey(year, monthIndex, day) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function formatHumanDate(dateKey) {
+  const [year, monthNumber, dayNumber] = dateKey.split("-").map(Number);
+  const date = new Date(year, monthNumber - 1, dayNumber);
+  return `${dayNumber} ${MONTH_GENITIVE[date.getMonth()]} (${DAY_NAMES[date.getDay()]})`;
+}
+
+function formatTodayHeadline(date) {
+  const dayName = DAY_NAMES[date.getDay()];
+  return `${dayName.charAt(0).toUpperCase() + dayName.slice(1)}, ${date.getDate()} ${MONTH_GENITIVE[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function pluralize(number, forms) {
+  const mod10 = number % 10;
+  const mod100 = number % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return forms[0];
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+    return forms[1];
+  }
+
+  return forms[2];
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((error) => {
+      console.error("Не удалось зарегистрировать service worker", error);
+    });
+  });
+}

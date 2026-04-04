@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">I ❤️ MY WORK</title>
+  <desc id="desc">Иконка приложения I love my work с сердцем и подписью MY WORK.</desc>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="#fff8f3" stroke="#e9ddd4" stroke-width="12" />
+  <text
+    x="256"
+    y="128"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="86"
+    font-weight="800"
+    letter-spacing="0"
+    fill="#1f1b19"
+  >
+    I
+  </text>
+  <path
+    d="M256 322 238 306C173 248 132 211 132 162c0-34 26-60 60-60 24 0 46 13 60 33 14-20 36-33 60-33 34 0 60 26 60 60 0 49-41 86-106 144l-10 16Z"
+    fill="#d84d5d"
+  />
+  <text
+    x="256"
+    y="368"
+    text-anchor="middle"
+    font-family="'Helvetica Neue', Arial, sans-serif"
+    font-size="68"
+    font-weight="800"
+    letter-spacing="3"
+    fill="#1f1b19"
+  >
+    MY
+  </text>
+  <text
+    x="256"
+    y="430"
+    text-anchor="middle"
+    font-family="'Helvetica Neue', Arial, sans-serif"
+    font-size="64"
+    font-weight="800"
+    letter-spacing="2"
+    fill="#1f1b19"
+  >
+    WORK
+  </text>
+</svg>
