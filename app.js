@@ -1,8 +1,7 @@
 const STORAGE_KEY = "shift-calendar-v1";
 const THEME_STORAGE_KEY = "shift-calendar-theme-v1";
 const LEGACY_QUOTE_STORAGE_KEY = "shift-calendar-last-quote-v1";
-const QUOTE_CYCLE_STORAGE_KEY = "shift-calendar-quote-cycle-v2";
-const QUOTE_DATA_URL = "./quotes.json";
+const PREDICTION_DATA_URL = "./predictions.json";
 const HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 const COUNTRY_CODE = "RU";
 const DEFAULT_CUSTOM_COLOR = "#7fa8ff";
@@ -14,19 +13,17 @@ const LEGACY_MANICURE_PROCEDURE = {
 };
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const DAY_NAMES = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
-const QUOTE_FALLBACK = [
-  "Маленькие шаги каждый день дают большой результат.",
-  "Даже самый спокойный день может стать важным.",
-  "Ты не обязана делать всё сразу, достаточно делать по чуть-чуть.",
-  "Ритм тоже успех, не только скорость.",
-  "Хорошо сделанный обычный день уже многое значит.",
-  "Пусть сегодня будет просто хороший, ровный день.",
-  "Забота о себе тоже часть плана, а не пауза от него.",
-  "Стабильность часто красивее спешки.",
-  "Иногда лучший прогресс это просто не сдаваться.",
-  "Порядок в мелочах очень бережёт силы.",
-  "Один отмеченный день уже делает месяц понятнее.",
-  "Спокойный план помогает дышать свободнее.",
+const PREDICTION_FALLBACK = [
+  "Сегодня случится что-то небольшое, но очень приятное.",
+  "Сегодня удачное решение придёт спокойнее, чем ты ожидала.",
+  "Этот день принесёт маленький знак, что всё складывается верно.",
+  "Сегодня одна деталь неожиданно улучшит настроение.",
+  "К вечеру день покажется теплее и добрее, чем утром.",
+  "Сегодня появится ощущение, что всё понемногу встаёт на место.",
+  "Этот день приведёт к хорошему совпадению.",
+  "Сегодня будет повод улыбнуться без лишней причины.",
+  "Нужный ответ сегодня придёт вовремя.",
+  "Обычный день сегодня окажется удачнее, чем кажется.",
 ];
 const MONTH_GENITIVE = [
   "января",
@@ -91,7 +88,7 @@ let selectedDateKey =
   initialState.selectedDateKey || formatDateKey(viewDate.getFullYear(), viewDate.getMonth(), 1);
 const holidayCache = new Map(Object.entries(initialState.holidaysCache || {}));
 let theme = loadTheme();
-let currentQuote = "Подбираю новую цитату...";
+let currentQuote = "Подбираю предсказание дня...";
 let quotePoolPromise = null;
 let holidayStatus = {
   state: "loading",
@@ -203,7 +200,6 @@ function bindEvents() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(THEME_STORAGE_KEY);
     localStorage.removeItem(LEGACY_QUOTE_STORAGE_KEY);
-    localStorage.removeItem(QUOTE_CYCLE_STORAGE_KEY);
 
     if ("caches" in window) {
       const cacheKeys = await caches.keys();
@@ -1333,10 +1329,10 @@ function renderThemeToggle() {
 async function initializeQuote() {
   try {
     const quotes = await loadQuotePool();
-    currentQuote = getNextQuote(quotes);
+    currentQuote = getPredictionForDate(quotes, today);
   } catch (error) {
-    console.error("Не удалось подготовить новую цитату", error);
-    currentQuote = getNextQuote(QUOTE_FALLBACK);
+    console.error("Не удалось подготовить предсказание дня", error);
+    currentQuote = getPredictionForDate(PREDICTION_FALLBACK, today);
   }
 
   renderQuote();
@@ -1344,7 +1340,7 @@ async function initializeQuote() {
 
 async function loadQuotePool() {
   if (!quotePoolPromise) {
-    quotePoolPromise = fetch(QUOTE_DATA_URL)
+    quotePoolPromise = fetch(PREDICTION_DATA_URL)
       .then((response) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -1361,73 +1357,47 @@ async function loadQuotePool() {
 function sanitizeQuotePool(payload) {
   const quotes = Array.isArray(payload) ? payload.map(normalizeQuote).filter(Boolean) : [];
   const uniqueQuotes = [...new Set(quotes)];
-  return uniqueQuotes.length ? uniqueQuotes : QUOTE_FALLBACK;
+  return uniqueQuotes.length ? uniqueQuotes : PREDICTION_FALLBACK;
 }
 
 function normalizeQuote(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
 }
 
-function loadQuoteCycleState() {
-  try {
-    const raw = localStorage.getItem(QUOTE_CYCLE_STORAGE_KEY);
-    if (!raw) {
-      return { poolSize: 0, lastIndex: -1, remaining: [] };
-    }
-
-    const parsed = JSON.parse(raw);
-    return {
-      poolSize: Number.isInteger(parsed.poolSize) ? parsed.poolSize : 0,
-      lastIndex: Number.isInteger(parsed.lastIndex) ? parsed.lastIndex : -1,
-      remaining: Array.isArray(parsed.remaining) ? parsed.remaining : [],
-    };
-  } catch (error) {
-    console.error("Не удалось прочитать очередь цитат", error);
-    return { poolSize: 0, lastIndex: -1, remaining: [] };
-  }
-}
-
-function persistQuoteCycleState(state) {
-  localStorage.setItem(QUOTE_CYCLE_STORAGE_KEY, JSON.stringify(state));
-}
-
-function getNextQuote(pool) {
+function getPredictionForDate(pool, date) {
   const quotes = sanitizeQuotePool(pool);
-  const storedState = loadQuoteCycleState();
-  const isValidIndex = (value) => Number.isInteger(value) && value >= 0 && value < quotes.length;
-
-  let remaining =
-    storedState.poolSize === quotes.length
-      ? storedState.remaining.filter(isValidIndex)
-      : [];
-
-  if (!remaining.length) {
-    remaining = shuffleIndices(quotes.length);
+  if (!quotes.length) {
+    return "";
   }
 
-  if (remaining.length > 1 && remaining[0] === storedState.lastIndex) {
-    [remaining[0], remaining[1]] = [remaining[1], remaining[0]];
-  }
-
-  const nextIndex = remaining.shift() ?? 0;
-  persistQuoteCycleState({
-    poolSize: quotes.length,
-    lastIndex: nextIndex,
-    remaining,
-  });
-
+  const dayOfYear = getDayOfYear(date);
+  const year = date.getFullYear();
+  const orderedIndices = shuffleIndicesWithSeed(quotes.length, `${year}-predictions`);
+  const nextIndex = orderedIndices[(dayOfYear - 1) % orderedIndices.length] ?? 0;
   return quotes[nextIndex];
 }
 
-function shuffleIndices(length) {
+function shuffleIndicesWithSeed(length, seedSource) {
   const indices = Array.from({ length }, (_, index) => index);
+  let seed = Math.abs(hashString(seedSource)) || 1;
+
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
 
   for (let index = indices.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
+    const randomIndex = Math.floor(random() * (index + 1));
     [indices[index], indices[randomIndex]] = [indices[randomIndex], indices[index]];
   }
 
   return indices;
+}
+
+function getDayOfYear(date) {
+  const startOfYear = new Date(date.getFullYear(), 0, 0);
+  const diff = date - startOfYear;
+  return Math.floor(diff / 86400000);
 }
 
 function ensureMonthInView() {

@@ -20,7 +20,7 @@
       <section class="hero-card">
         <h1>График смен</h1>
         <blockquote class="quote-card" aria-live="polite">
-          <p class="quote-label">цитата дня</p>
+          <p class="quote-label">предсказание дня</p>
           <p class="quote-text" id="quoteText"></p>
         </blockquote>
       </section>
@@ -41,21 +41,21 @@
         <div class="toolbar">
           <div class="toolbar-actions">
             <button class="secondary-button" id="todayButton" type="button">Сегодня</button>
-            <button class="theme-button" id="themeToggleButton" type="button">Тёмный режим</button>
           </div>
         </div>
 
-        <div class="weekdays" id="weekdayHeaders" aria-hidden="true"></div>
-        <div class="calendar-grid" id="calendarGrid" aria-label="Календарь месяца"></div>
         <div class="today-focus">
           <p class="today-focus-label">Сегодня</p>
           <p class="today-date-label today-date-prominent" id="todayDateLabel"></p>
         </div>
+        <div class="weekdays" id="weekdayHeaders" aria-hidden="true"></div>
+        <div class="calendar-grid" id="calendarGrid" aria-label="Календарь месяца"></div>
         <div class="legend-strip" id="legendStrip" aria-label="Обозначения"></div>
         <div class="brush-picker brush-picker-bottom" id="brushPicker" role="radiogroup" aria-label="Режим отметки">
           <button class="brush-button" data-brush="work" type="button">Смена</button>
           <button class="brush-button" data-brush="clear" type="button">Стереть</button>
         </div>
+        <button class="theme-button theme-button-bottom" id="themeToggleButton" type="button">Тёмный режим</button>
       </section>
 
       <section class="panel details-panel" id="selectedDayPanel" aria-live="polite">

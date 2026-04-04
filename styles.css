@@ -259,6 +259,11 @@ h1 {
   font-weight: 700;
 }
 
+.theme-button-bottom {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .reset-button {
   padding: 10px 14px 9px;
   border-radius: 16px;
@@ -529,7 +534,7 @@ html[data-theme="dark"] .custom-delete-button {
 }
 
 .today-focus {
-  margin-top: 12px;
+  margin-top: 4px;
   margin-bottom: 10px;
   padding: 14px 16px;
   border-radius: 20px;
