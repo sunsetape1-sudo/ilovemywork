@@ -1091,7 +1091,7 @@ function renderCustomProcedureFormState() {
       : "";
   ui.customBrushEmpty.textContent = initialState.customProcedures.length
     ? ""
-    : `Пока нет своих меток. Можно добавить до ${MAX_CUSTOM_PROCEDURES}.`;
+    : "Пока нет своих меток.";
   ui.deleteCustomProcedureButton.textContent = activeProcedure
     ? `Удалить метку «${activeProcedure.name}»`
     : "Удалить выбранную метку";
