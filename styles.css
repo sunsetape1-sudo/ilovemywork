@@ -261,7 +261,7 @@ h1 {
 
 .theme-button-bottom {
   width: 100%;
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .reset-button {
@@ -318,7 +318,7 @@ html[data-theme="dark"] .note-history-item {
 }
 
 .brush-picker-bottom {
-  margin-top: 12px;
+  margin-top: 18px;
   margin-bottom: 0;
 }
 
@@ -484,6 +484,7 @@ html[data-theme="dark"] .custom-delete-button {
   flex-wrap: wrap;
   gap: 8px;
   width: 100%;
+  margin-top: 10px;
 }
 
 .legend-item {
@@ -535,7 +536,7 @@ html[data-theme="dark"] .custom-delete-button {
 
 .today-focus {
   margin-top: 4px;
-  margin-bottom: 10px;
+  margin-bottom: 18px;
   padding: 14px 16px;
   border-radius: 20px;
   background: var(--bg-accent);

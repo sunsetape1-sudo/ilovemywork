@@ -1,4 +1,4 @@
-const CACHE_NAME = "shift-calendar-static-v23";
+const CACHE_NAME = "shift-calendar-static-v24";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
