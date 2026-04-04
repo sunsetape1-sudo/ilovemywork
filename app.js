@@ -56,7 +56,6 @@ const ui = {
   fortuneLabel: document.querySelector("#fortuneLabel"),
   fortuneCookieButton: document.querySelector("#fortuneCookieButton"),
   fortuneCookieShape: document.querySelector("#fortuneCookieShape"),
-  fortuneCookieHint: document.querySelector("#fortuneCookieHint"),
   quoteText: document.querySelector("#quoteText"),
   brushPicker: document.querySelector("#brushPicker"),
   customBrushList: document.querySelector("#customBrushList"),
@@ -470,7 +469,6 @@ function renderQuote() {
 
   if (dailyFortuneState.revealed) {
     ui.fortuneCookieButton.classList.add("is-open");
-    ui.fortuneCookieHint.textContent = "Предсказание уже открыто и останется до конца дня.";
     return;
   }
 
@@ -479,11 +477,6 @@ function renderQuote() {
   if (cracks >= 2) ui.fortuneCookieButton.classList.add("is-crack-2");
   if (cracks >= 3) ui.fortuneCookieButton.classList.add("is-crack-3");
   if (cracks >= FORTUNE_CLICKS_TO_OPEN) ui.fortuneCookieButton.classList.add("is-open");
-
-  const clicksLeft = Math.max(0, FORTUNE_CLICKS_TO_OPEN - cracks);
-  ui.fortuneCookieHint.textContent = clicksLeft
-    ? `${pluralize(clicksLeft, ["Ещё 1 нажатие", `Ещё ${clicksLeft} нажатия`, `Ещё ${clicksLeft} нажатий`])} до предсказания`
-    : "Печенька уже раскрылась.";
 }
 
 function renderMonthHeading() {
