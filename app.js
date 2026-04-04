@@ -1,6 +1,9 @@
 const STORAGE_KEY = "shift-calendar-v1";
 const THEME_STORAGE_KEY = "shift-calendar-theme-v1";
 const LEGACY_QUOTE_STORAGE_KEY = "shift-calendar-last-quote-v1";
+const FORTUNE_STATE_KEY = "shift-calendar-fortune-v1";
+const FORTUNE_TEST_PASSWORD = "456347";
+const FORTUNE_CLICKS_TO_OPEN = 4;
 const PREDICTION_DATA_URL = "./predictions.json";
 const HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 const COUNTRY_CODE = "RU";
@@ -50,6 +53,10 @@ const ui = {
   legendStrip: document.querySelector("#legendStrip"),
   monthLabel: document.querySelector("#monthLabel"),
   todayDateLabel: document.querySelector("#todayDateLabel"),
+  fortuneLabel: document.querySelector("#fortuneLabel"),
+  fortuneCookieButton: document.querySelector("#fortuneCookieButton"),
+  fortuneCookieShape: document.querySelector("#fortuneCookieShape"),
+  fortuneCookieHint: document.querySelector("#fortuneCookieHint"),
   quoteText: document.querySelector("#quoteText"),
   brushPicker: document.querySelector("#brushPicker"),
   customBrushList: document.querySelector("#customBrushList"),
@@ -64,6 +71,7 @@ const ui = {
   importDataButton: document.querySelector("#importDataButton"),
   importDataInput: document.querySelector("#importDataInput"),
   refreshAppButton: document.querySelector("#refreshAppButton"),
+  secretCookieButton: document.querySelector("#secretCookieButton"),
   calendarGrid: document.querySelector("#calendarGrid"),
   weekdayHeaders: document.querySelector("#weekdayHeaders"),
   workCount: document.querySelector("#workCount"),
@@ -97,6 +105,7 @@ const holidayCache = new Map(Object.entries(initialState.holidaysCache || {}));
 let theme = loadTheme();
 let currentQuote = "Подбираю предсказание дня...";
 let quotePoolPromise = null;
+let dailyFortuneState = loadFortuneState();
 let holidayStatus = {
   state: "loading",
   message: "Загружаю праздники...",
@@ -220,6 +229,7 @@ function bindEvents() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(THEME_STORAGE_KEY);
     localStorage.removeItem(LEGACY_QUOTE_STORAGE_KEY);
+    localStorage.removeItem(FORTUNE_STATE_KEY);
 
     if ("caches" in window) {
       const cacheKeys = await caches.keys();
@@ -231,6 +241,14 @@ function bindEvents() {
 
   ui.refreshAppButton.addEventListener("click", async () => {
     await refreshApplicationPreservingData();
+  });
+
+  ui.fortuneCookieButton.addEventListener("click", () => {
+    crackFortuneCookie();
+  });
+
+  ui.secretCookieButton.addEventListener("click", () => {
+    openSecretFortuneReset();
   });
 
   ui.exportDataButton.addEventListener("click", () => {
@@ -443,7 +461,29 @@ function renderLegend() {
 }
 
 function renderQuote() {
+  dailyFortuneState = ensureFortuneStateForToday(dailyFortuneState);
+  ui.fortuneLabel.textContent = dailyFortuneState.revealed ? "предсказание дня" : "печенька дня";
   ui.quoteText.textContent = currentQuote;
+  ui.quoteText.hidden = !dailyFortuneState.revealed;
+  ui.fortuneCookieButton.hidden = false;
+  ui.fortuneCookieButton.classList.remove("is-crack-1", "is-crack-2", "is-crack-3", "is-open");
+
+  if (dailyFortuneState.revealed) {
+    ui.fortuneCookieButton.classList.add("is-open");
+    ui.fortuneCookieHint.textContent = "Предсказание уже открыто и останется до конца дня.";
+    return;
+  }
+
+  const cracks = Math.max(0, Math.min(FORTUNE_CLICKS_TO_OPEN, dailyFortuneState.cracks || 0));
+  if (cracks >= 1) ui.fortuneCookieButton.classList.add("is-crack-1");
+  if (cracks >= 2) ui.fortuneCookieButton.classList.add("is-crack-2");
+  if (cracks >= 3) ui.fortuneCookieButton.classList.add("is-crack-3");
+  if (cracks >= FORTUNE_CLICKS_TO_OPEN) ui.fortuneCookieButton.classList.add("is-open");
+
+  const clicksLeft = Math.max(0, FORTUNE_CLICKS_TO_OPEN - cracks);
+  ui.fortuneCookieHint.textContent = clicksLeft
+    ? `${pluralize(clicksLeft, ["Ещё 1 нажатие", `Ещё ${clicksLeft} нажатия`, `Ещё ${clicksLeft} нажатий`])} до предсказания`
+    : "Печенька уже раскрылась.";
 }
 
 function renderMonthHeading() {
@@ -1711,6 +1751,85 @@ function applyTheme(nextTheme) {
 
 function renderThemeToggle() {
   ui.themeToggleButton.textContent = theme === "dark" ? "Светлый режим" : "Тёмный режим";
+}
+
+function loadFortuneState() {
+  try {
+    const raw = localStorage.getItem(FORTUNE_STATE_KEY);
+    if (!raw) {
+      return createDefaultFortuneState();
+    }
+
+    const parsed = JSON.parse(raw);
+    return ensureFortuneStateForToday({
+      dateKey: normalizeDateKey(parsed.dateKey) || formatDateKey(today.getFullYear(), today.getMonth(), today.getDate()),
+      cracks: Math.max(0, Math.min(FORTUNE_CLICKS_TO_OPEN, Number.parseInt(parsed.cracks, 10) || 0)),
+      revealed: Boolean(parsed.revealed),
+    });
+  } catch (error) {
+    console.error("Не удалось прочитать состояние печеньки дня", error);
+    return createDefaultFortuneState();
+  }
+}
+
+function createDefaultFortuneState() {
+  return {
+    dateKey: formatDateKey(today.getFullYear(), today.getMonth(), today.getDate()),
+    cracks: 0,
+    revealed: false,
+  };
+}
+
+function ensureFortuneStateForToday(state) {
+  const todayKey = formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+  if (!state || state.dateKey !== todayKey) {
+    const nextState = createDefaultFortuneState();
+    persistFortuneState(nextState);
+    return nextState;
+  }
+
+  return {
+    dateKey: todayKey,
+    cracks: Math.max(0, Math.min(FORTUNE_CLICKS_TO_OPEN, Number.parseInt(state.cracks, 10) || 0)),
+    revealed: Boolean(state.revealed),
+  };
+}
+
+function persistFortuneState(state = dailyFortuneState) {
+  localStorage.setItem(FORTUNE_STATE_KEY, JSON.stringify(state));
+}
+
+function crackFortuneCookie() {
+  dailyFortuneState = ensureFortuneStateForToday(dailyFortuneState);
+  if (dailyFortuneState.revealed) {
+    return;
+  }
+
+  const nextCracks = Math.min(FORTUNE_CLICKS_TO_OPEN, (dailyFortuneState.cracks || 0) + 1);
+  dailyFortuneState = {
+    ...dailyFortuneState,
+    cracks: nextCracks,
+    revealed: nextCracks >= FORTUNE_CLICKS_TO_OPEN,
+  };
+  persistFortuneState();
+  renderQuote();
+}
+
+function openSecretFortuneReset() {
+  const password = window.prompt("Введите пароль, чтобы снова показать печеньку дня.");
+  if (password === null) {
+    return;
+  }
+
+  if (password !== FORTUNE_TEST_PASSWORD) {
+    window.alert("Неверный пароль.");
+    return;
+  }
+
+  dailyFortuneState = createDefaultFortuneState();
+  persistFortuneState();
+  renderQuote();
+  window.alert("Печенька дня снова закрыта. Можно проверить механику.");
 }
 
 async function initializeQuote() {

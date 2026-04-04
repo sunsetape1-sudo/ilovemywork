@@ -18,10 +18,14 @@
   <body>
     <main class="app-shell">
       <section class="hero-card">
-        <blockquote class="quote-card" aria-live="polite">
-          <p class="quote-label">предсказание дня</p>
-          <p class="quote-text" id="quoteText"></p>
-        </blockquote>
+        <section class="fortune-card" aria-live="polite">
+          <p class="quote-label" id="fortuneLabel">печенька дня</p>
+          <button class="fortune-cookie" id="fortuneCookieButton" type="button" aria-label="Открыть печеньку дня">
+            <span class="fortune-cookie-shape" id="fortuneCookieShape" aria-hidden="true"></span>
+            <span class="fortune-cookie-hint" id="fortuneCookieHint">Нажми несколько раз, чтобы разломить печеньку</span>
+          </button>
+          <p class="fortune-text" id="quoteText" hidden></p>
+        </section>
       </section>
 
       <section class="panel main-calendar-panel">
@@ -148,6 +152,7 @@
           <input id="importDataInput" type="file" accept="application/json" hidden>
         </div>
         <button class="refresh-button refresh-button-subtle" id="refreshAppButton" type="button">Обновить страницу</button>
+        <button class="secret-button" id="secretCookieButton" type="button">Проверить печеньку</button>
         <button class="reset-button reset-button-subtle" id="resetDataButton" type="button">Очистить кэш</button>
         <p class="app-credit">Разработано для личного использования @altregor</p>
       </div>

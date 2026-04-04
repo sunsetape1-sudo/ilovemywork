@@ -118,7 +118,7 @@ h1 {
   font-weight: 800;
 }
 
-.quote-card {
+.fortune-card {
   margin: 10px 0 0;
   padding: 12px 14px;
   border-radius: 18px;
@@ -134,11 +134,92 @@ h1 {
   letter-spacing: 0.14em;
 }
 
-.quote-text {
+.fortune-cookie {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 8px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.fortune-cookie-shape {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 84px;
+  border-radius: 60% 60% 52% 52% / 68% 68% 40% 40%;
+  background: #d49b55;
+  box-shadow: inset 0 -10px 0 rgba(125, 73, 26, 0.12), inset 0 0 0 1px rgba(91, 54, 25, 0.12);
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.fortune-cookie-shape::before,
+.fortune-cookie-shape::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  width: 44px;
+  height: 64px;
+  background: #dda667;
+  border-radius: 60% 55% 55% 60%;
+  transition: transform 220ms ease, opacity 180ms ease;
+}
+
+.fortune-cookie-shape::before {
+  left: 14px;
+  transform: rotate(22deg);
+}
+
+.fortune-cookie-shape::after {
+  right: 14px;
+  transform: rotate(-22deg);
+}
+
+.fortune-cookie-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.fortune-cookie.is-crack-1 .fortune-cookie-shape {
+  transform: rotate(-2deg) scale(0.99);
+}
+
+.fortune-cookie.is-crack-2 .fortune-cookie-shape {
+  transform: rotate(2deg) scale(0.985);
+}
+
+.fortune-cookie.is-crack-3 .fortune-cookie-shape::before {
+  transform: translateX(-6px) rotate(10deg);
+}
+
+.fortune-cookie.is-crack-3 .fortune-cookie-shape::after {
+  transform: translateX(6px) rotate(-10deg);
+}
+
+.fortune-cookie.is-open .fortune-cookie-shape::before {
+  transform: translateX(-14px) rotate(-12deg);
+}
+
+.fortune-cookie.is-open .fortune-cookie-shape::after {
+  transform: translateX(14px) rotate(12deg);
+}
+
+.fortune-cookie.is-open .fortune-cookie-shape {
+  filter: saturate(0.92);
+}
+
+.fortune-text {
   margin-top: 8px;
   font-family: "Caveat", cursive;
   font-size: clamp(1.65rem, 5vw, 2.2rem);
   line-height: 1.08;
+  text-align: center;
 }
 
 .status-banner {
@@ -301,7 +382,7 @@ html[data-theme="dark"] .holiday-item,
 html[data-theme="dark"] .holiday-empty,
 html[data-theme="dark"] .tag,
 html[data-theme="dark"] .status-banner,
-html[data-theme="dark"] .quote-card {
+html[data-theme="dark"] .fortune-card {
   background-color: var(--bg-accent);
 }
 
@@ -438,19 +519,9 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-select-input {
   width: 100%;
-  padding: 0 42px 0 14px;
+  padding: 0 14px;
   appearance: none;
   cursor: pointer;
-}
-
-.custom-select-field::after {
-  content: "▾";
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
-  font-size: 1rem;
-  color: var(--muted);
-  pointer-events: none;
 }
 
 .custom-select-note {
@@ -1029,6 +1100,22 @@ html[data-theme="dark"] .day-cell.is-weekend.is-work {
 .refresh-button-subtle {
   color: var(--today);
   opacity: 0.86;
+}
+
+.secret-button {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(92, 84, 121, 0.34);
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+html[data-theme="dark"] .secret-button {
+  color: rgba(214, 208, 230, 0.28);
 }
 
 .app-credit {
