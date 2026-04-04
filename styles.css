@@ -233,7 +233,7 @@ h1 {
 .toolbar {
   align-items: flex-start;
   flex-direction: column;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .toolbar-actions {
@@ -529,7 +529,8 @@ html[data-theme="dark"] .custom-delete-button {
 }
 
 .today-focus {
-  margin-bottom: 12px;
+  margin-top: 12px;
+  margin-bottom: 10px;
   padding: 14px 16px;
   border-radius: 20px;
   background: var(--bg-accent);
