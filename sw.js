@@ -1,4 +1,4 @@
-const CACHE_NAME = "shift-calendar-static-v29";
+const CACHE_NAME = "shift-calendar-static-v30";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -10,13 +10,6 @@ const STATIC_ASSETS = [
   "./icon-180.png",
   "./icon-192.png",
   "./icon-512.png",
-  "./images/flowers/camellia.jpg",
-  "./images/flowers/crocus.jpg",
-  "./images/flowers/tulip.jpg",
-  "./images/flowers/iris.jpg",
-  "./images/flowers/daisy.jpg",
-  "./images/flowers/sunflower.jpg",
-  "./images/flowers/chrysanthemum.jpg",
 ];
 
 self.addEventListener("install", (event) => {
