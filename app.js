@@ -915,7 +915,7 @@ function sanitizeCustomEvents(events, customProcedures = []) {
         id,
         procedureId,
         startDateKey,
-        repeatMode: normalizeRepeatMode(event.repeatMode, procedureById.get(procedureId)?.name || ""),
+        repeatMode: normalizeEventRepeatMode(event.repeatMode, procedureById.get(procedureId)?.name || ""),
         deletedOccurrences: sanitizeDeletedOccurrences(event.deletedOccurrences),
       };
     })
@@ -1253,7 +1253,7 @@ function isProcedureVisibleInMonth(procedure, monthKey) {
 
 function getRepeatModeLabel(repeatMode) {
   if (repeatMode === REPEAT_MODE_CARRY) {
-    return "ежемесячно";
+    return "в следующих месяцах";
   }
 
   if (repeatMode === REPEAT_MODE_BIRTHDAY) {
@@ -1269,6 +1269,10 @@ function normalizeRepeatMode(value, name = "") {
   }
 
   return [REPEAT_MODE_SINGLE, REPEAT_MODE_CARRY, REPEAT_MODE_BIRTHDAY].includes(value) ? value : REPEAT_MODE_SINGLE;
+}
+
+function normalizeEventRepeatMode(value, name = "") {
+  return normalizeRepeatMode(value, name) === REPEAT_MODE_BIRTHDAY ? REPEAT_MODE_BIRTHDAY : REPEAT_MODE_SINGLE;
 }
 
 function normalizeMonthKey(value) {
@@ -1350,16 +1354,6 @@ function getEventOccurrenceDateKeyIgnoringExceptions(event, targetDateKey) {
     return null;
   }
 
-  if (event.repeatMode === REPEAT_MODE_CARRY) {
-    const targetMonthKey = formatMonthPrefix(targetDate.getFullYear(), targetDate.getMonth());
-    const startMonthKey = formatMonthPrefix(startDate.getFullYear(), startDate.getMonth());
-    if (targetMonthKey < startMonthKey) {
-      return null;
-    }
-    const occurrence = getClampedDateKey(targetDate.getFullYear(), targetDate.getMonth(), startDate.getDate());
-    return occurrence === targetDateKey ? occurrence : null;
-  }
-
   if (event.repeatMode === REPEAT_MODE_BIRTHDAY) {
     if (targetDate.getMonth() !== startDate.getMonth()) {
       return null;
@@ -1390,7 +1384,7 @@ function createCustomEvent(procedureId, dateKey, repeatMode) {
     id: createProcedureId(),
     procedureId,
     startDateKey: dateKey,
-    repeatMode,
+    repeatMode: normalizeEventRepeatMode(repeatMode),
     deletedOccurrences: [],
   };
 }
@@ -1485,7 +1479,8 @@ function renderCustomProcedureFormState() {
   ui.customBrushEmpty.textContent = getVisibleCustomProcedures().length
     ? ""
     : "Пока нет своих меток.";
-  ui.customHint.textContent = `Открыт ${formatMonthKey(viewDate)}. Одноразовые метки видны только в этом месяце, переносимые идут дальше, «ДР» повторяются раз в год.`;
+  ui.customHint.textContent =
+    `Открыт ${formatMonthKey(viewDate)}. Переносимые метки остаются в следующих месяцах, но дни в них нужно выбирать заново. «ДР» повторяются раз в год.`;
   ui.deleteCustomProcedureButton.textContent = activeProcedure
     ? `Удалить метку «${activeProcedure.name}»`
     : "Удалить выбранную метку";
