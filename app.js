@@ -39,6 +39,20 @@ const MONTH_GENITIVE = [
   "ноября",
   "декабря",
 ];
+const MONTHLY_BLOOMS = [
+  { name: "морозник", shape: "droop", petal: "#d9d0ea", accent: "#b9aad7", stem: "#c7bfdc" },
+  { name: "подснежник", shape: "bell", petal: "#edf4ff", accent: "#cddcf7", stem: "#b9d0c0" },
+  { name: "крокус", shape: "cup", petal: "#c8b3ec", accent: "#9f85d8", stem: "#a9c8ad" },
+  { name: "тюльпан", shape: "tulip", petal: "#f1b5c6", accent: "#d789a2", stem: "#9fc3a3" },
+  { name: "ландыш", shape: "cluster", petal: "#f8fbff", accent: "#d9e6d9", stem: "#a9c9aa" },
+  { name: "ирис", shape: "iris", petal: "#bca9ef", accent: "#9270d0", stem: "#9fbfa6" },
+  { name: "ромашка", shape: "daisy", petal: "#fffaf1", accent: "#f2c96b", stem: "#a8c89e" },
+  { name: "подсолнух", shape: "sun", petal: "#f4cd62", accent: "#c18a2a", stem: "#a8c27c" },
+  { name: "георгин", shape: "rosette", petal: "#e7a6bd", accent: "#c76c96", stem: "#a8bc9a" },
+  { name: "хризантема", shape: "burst", petal: "#f2c28d", accent: "#cd8a43", stem: "#b1b58f" },
+  { name: "астра", shape: "star", petal: "#caa7e5", accent: "#9a72c1", stem: "#b0b6a1" },
+  { name: "камелия", shape: "camellia", petal: "#eab6c6", accent: "#cf7c98", stem: "#b7c0ad" },
+];
 
 const ui = {
   holidayStatus: document.querySelector("#holidayStatus"),
@@ -423,6 +437,237 @@ function renderMonthHeading() {
   const formatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
   const monthText = formatter.format(viewDate);
   ui.monthLabel.textContent = monthText.charAt(0).toUpperCase() + monthText.slice(1);
+  applyMonthlyBloomBackdrop(viewDate.getMonth());
+}
+
+function applyMonthlyBloomBackdrop(monthIndex) {
+  const bloom = MONTHLY_BLOOMS[monthIndex] || MONTHLY_BLOOMS[today.getMonth()];
+  const root = document.documentElement;
+  root.style.setProperty("--month-flower-left", buildMonthlyBloomDataUrl(bloom, "left"));
+  root.style.setProperty("--month-flower-right", buildMonthlyBloomDataUrl(bloom, "right"));
+}
+
+function buildMonthlyBloomDataUrl(bloom, side) {
+  const width = 360;
+  const height = 560;
+  const groupStart = side === "right" ? `<g transform="translate(${width} 0) scale(-1 1)">` : "<g>";
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" fill="none">
+      <g opacity="0.92">
+        <circle cx="112" cy="172" r="112" fill="${withAlpha(bloom.petal, 0.13)}" />
+        <circle cx="206" cy="318" r="132" fill="${withAlpha(bloom.accent, 0.08)}" />
+      </g>
+      ${groupStart}
+        <g stroke="${withAlpha(bloom.stem, 0.62)}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M92 528C98 456 124 408 170 352" />
+          <path d="M152 544C156 470 198 404 250 320" />
+          <path d="M118 438C136 434 150 422 160 404" />
+          <path d="M180 396C204 394 222 382 232 364" />
+        </g>
+        <g fill="${withAlpha(bloom.stem, 0.18)}">
+          <ellipse cx="132" cy="428" rx="22" ry="10" transform="rotate(-24 132 428)" />
+          <ellipse cx="208" cy="384" rx="24" ry="10" transform="rotate(18 208 384)" />
+        </g>
+        ${buildFlowerShape(bloom, side)}
+      </g>
+    </svg>
+  `;
+
+  return `url("data:image/svg+xml,${encodeURIComponent(svg.replace(/\s+/g, " ").trim())}")`;
+}
+
+function buildFlowerShape(bloom, side) {
+  const primaryX = side === "right" ? 198 : 172;
+  const secondaryX = side === "right" ? 246 : 230;
+
+  switch (bloom.shape) {
+    case "bell":
+      return `${buildBellCluster(primaryX, 336, bloom, 1)}${buildBellCluster(secondaryX, 300, bloom, 0.86)}`;
+    case "cup":
+      return `${buildCupFlower(primaryX, 336, bloom, 1)}${buildCupFlower(secondaryX, 298, bloom, 0.82)}`;
+    case "tulip":
+      return `${buildTulipFlower(primaryX, 336, bloom)}${buildTulipFlower(secondaryX, 294, bloom, 0.82)}`;
+    case "cluster":
+      return `${buildLilyCluster(primaryX, 332, bloom)}${buildLilyCluster(secondaryX, 294, bloom, 0.82)}`;
+    case "iris":
+      return `${buildIrisFlower(primaryX, 334, bloom)}${buildIrisFlower(secondaryX, 294, bloom, 0.82)}`;
+    case "daisy":
+      return `${buildRadialFlower(primaryX, 336, 38, 10, bloom, { center: 12, width: 7, length: 24 })}${buildRadialFlower(
+        secondaryX,
+        296,
+        30,
+        10,
+        bloom,
+        { center: 9, width: 6, length: 18 }
+      )}`;
+    case "sun":
+      return `${buildRadialFlower(primaryX, 334, 42, 14, bloom, { center: 13, width: 8, length: 26 })}${buildRadialFlower(
+        secondaryX,
+        292,
+        31,
+        12,
+        bloom,
+        { center: 10, width: 7, length: 19 }
+      )}`;
+    case "rosette":
+      return `${buildRosetteFlower(primaryX, 336, 40, bloom)}${buildRosetteFlower(secondaryX, 294, 30, bloom)}`;
+    case "burst":
+      return `${buildBurstFlower(primaryX, 334, 40, bloom)}${buildBurstFlower(secondaryX, 294, 30, bloom)}`;
+    case "star":
+      return `${buildRadialFlower(primaryX, 334, 38, 8, bloom, { center: 10, width: 5, length: 24 })}${buildRadialFlower(
+        secondaryX,
+        294,
+        29,
+        8,
+        bloom,
+        { center: 8, width: 4, length: 18 }
+      )}`;
+    case "camellia":
+      return `${buildCamelliaFlower(primaryX, 334, 38, bloom)}${buildCamelliaFlower(secondaryX, 294, 29, bloom)}`;
+    case "droop":
+    default:
+      return `${buildDroopFlower(primaryX, 334, bloom)}${buildDroopFlower(secondaryX, 294, bloom, 0.82)}`;
+  }
+}
+
+function buildDroopFlower(x, y, bloom, scale = 1) {
+  const petal = 15 * scale;
+  return `
+    <g transform="translate(${x} ${y}) rotate(-14)">
+      <ellipse cx="0" cy="6" rx="${petal}" ry="${petal * 1.22}" fill="${withAlpha(bloom.petal, 0.34)}" stroke="${withAlpha(
+    bloom.accent,
+    0.56
+  )}" stroke-width="1.4" />
+      <ellipse cx="-11" cy="1" rx="${petal * 0.72}" ry="${petal}" fill="${withAlpha(bloom.petal, 0.26)}" />
+      <ellipse cx="11" cy="1" rx="${petal * 0.72}" ry="${petal}" fill="${withAlpha(bloom.petal, 0.26)}" />
+      <circle cx="0" cy="6" r="${4.5 * scale}" fill="${withAlpha(bloom.accent, 0.5)}" />
+    </g>
+  `;
+}
+
+function buildBellCluster(x, y, bloom, scale = 1) {
+  const width = 15 * scale;
+  const height = 20 * scale;
+  return `
+    <g stroke="${withAlpha(bloom.stem, 0.58)}" stroke-width="2.2" stroke-linecap="round">
+      <path d="M${x} ${y - 38 * scale} C ${x - 6} ${y - 24 * scale}, ${x - 10} ${y - 16 * scale}, ${x - 14} ${y - 2 * scale}" />
+      <path d="M${x} ${y - 38 * scale} C ${x + 4} ${y - 22 * scale}, ${x + 10} ${y - 18 * scale}, ${x + 14} ${y - 2 * scale}" />
+    </g>
+    <g fill="${withAlpha(bloom.petal, 0.34)}" stroke="${withAlpha(bloom.accent, 0.52)}" stroke-width="1.2">
+      <path d="M${x - 14 * scale} ${y - 2 * scale} q ${width * 0.65} ${height * 0.2} ${width * 1.3} 0 q -1 ${height * 0.82} -${width * 0.65} ${height} q -${width * 0.65} -${height * 0.18} -${width * 0.65} -${height}z" />
+      <path d="M${x + 2 * scale} ${y - 2 * scale} q ${width * 0.62} ${height * 0.2} ${width * 1.24} 0 q -1 ${height * 0.78} -${width * 0.62} ${height * 0.96} q -${width * 0.62} -${height * 0.18} -${width * 0.62} -${height * 0.96}z" />
+    </g>
+  `;
+}
+
+function buildCupFlower(x, y, bloom) {
+  return `
+    <g transform="translate(${x} ${y})">
+      <path d="M-18 10 C -16 -18, 16 -18, 18 10 C 8 22, -8 22, -18 10Z" fill="${withAlpha(
+        bloom.petal,
+        0.3
+      )}" stroke="${withAlpha(bloom.accent, 0.54)}" stroke-width="1.4" />
+      <path d="M-12 8 C -8 -10, -2 -18, 2 2" stroke="${withAlpha(bloom.accent, 0.34)}" stroke-width="1.1" fill="none" />
+      <path d="M12 8 C 8 -10, 2 -18, -2 2" stroke="${withAlpha(bloom.accent, 0.34)}" stroke-width="1.1" fill="none" />
+      <circle cx="0" cy="7" r="4" fill="${withAlpha(bloom.accent, 0.44)}" />
+    </g>
+  `;
+}
+
+function buildTulipFlower(x, y, bloom, scale = 1) {
+  return `
+    <g transform="translate(${x} ${y}) scale(${scale})">
+      <path d="M-20 10 C -18 -12, -10 -18, -3 -8 C 0 -22, 6 -22, 9 -8 C 16 -18, 24 -12, 20 10 C 8 20, -8 20, -20 10Z" fill="${withAlpha(
+        bloom.petal,
+        0.32
+      )}" stroke="${withAlpha(bloom.accent, 0.56)}" stroke-width="1.4" />
+    </g>
+  `;
+}
+
+function buildLilyCluster(x, y, bloom, scale = 1) {
+  const bells = [
+    { dx: -12, dy: 0, r: -10 },
+    { dx: 2, dy: -10, r: 4 },
+    { dx: 16, dy: 2, r: 12 },
+  ];
+  return `
+    <g stroke="${withAlpha(bloom.stem, 0.54)}" stroke-width="2.1" stroke-linecap="round">
+      ${bells
+        .map(
+          ({ dx, dy }) =>
+            `<path d="M${x} ${y - 26 * scale} C ${x + dx * 0.45} ${y - 18 * scale}, ${x + dx * 0.7} ${y - 10 * scale}, ${
+              x + dx
+            } ${y + dy - 2}" />`
+        )
+        .join("")}
+    </g>
+    ${bells
+      .map(
+        ({ dx, dy, r }) => `
+          <g transform="translate(${x + dx} ${y + dy}) rotate(${r}) scale(${scale})">
+            <path d="M-10 0 C -7 8, 7 8, 10 0 C 8 13, -8 13, -10 0Z" fill="${withAlpha(
+              bloom.petal,
+              0.32
+            )}" stroke="${withAlpha(bloom.accent, 0.48)}" stroke-width="1.1" />
+          </g>
+        `
+      )
+      .join("")}
+  `;
+}
+
+function buildIrisFlower(x, y, bloom, scale = 1) {
+  return `
+    <g transform="translate(${x} ${y}) scale(${scale})">
+      <ellipse cx="0" cy="-8" rx="10" ry="18" fill="${withAlpha(bloom.petal, 0.26)}" transform="rotate(4)" />
+      <ellipse cx="-14" cy="4" rx="9" ry="16" fill="${withAlpha(bloom.petal, 0.32)}" transform="rotate(-34 -14 4)" />
+      <ellipse cx="14" cy="4" rx="9" ry="16" fill="${withAlpha(bloom.petal, 0.32)}" transform="rotate(34 14 4)" />
+      <ellipse cx="0" cy="8" rx="8" ry="12" fill="${withAlpha(bloom.accent, 0.24)}" />
+      <circle cx="0" cy="4" r="4.2" fill="${withAlpha(bloom.accent, 0.44)}" />
+    </g>
+  `;
+}
+
+function buildRadialFlower(x, y, radius, petals, bloom, options) {
+  const { center, width, length } = options;
+  const petalMarkup = Array.from({ length: petals }, (_, index) => {
+    const angle = (360 / petals) * index;
+    return `<ellipse cx="${x}" cy="${y - radius * 0.62}" rx="${width}" ry="${length}" fill="${withAlpha(
+      bloom.petal,
+      0.28
+    )}" stroke="${withAlpha(bloom.accent, 0.38)}" stroke-width="0.8" transform="rotate(${angle} ${x} ${y})" />`;
+  }).join("");
+
+  return `<g>${petalMarkup}<circle cx="${x}" cy="${y}" r="${center}" fill="${withAlpha(
+    bloom.accent,
+    0.42
+  )}" /></g>`;
+}
+
+function buildRosetteFlower(x, y, radius, bloom) {
+  return `
+    ${buildRadialFlower(x, y, radius, 14, bloom, { center: radius * 0.24, width: radius * 0.16, length: radius * 0.5 })}
+    ${buildRadialFlower(x, y, radius * 0.74, 12, bloom, { center: radius * 0.16, width: radius * 0.12, length: radius * 0.36 })}
+  `;
+}
+
+function buildBurstFlower(x, y, radius, bloom) {
+  const petals = Array.from({ length: 18 }, (_, index) => {
+    const angle = (360 / 18) * index;
+    return `<path d="M${x} ${y} l ${radius * 0.08} ${-radius * 0.92} l ${radius * 0.08} ${radius * 0.92} z" fill="${withAlpha(
+      bloom.petal,
+      0.24
+    )}" transform="rotate(${angle} ${x} ${y})" />`;
+  }).join("");
+  return `<g>${petals}<circle cx="${x}" cy="${y}" r="${radius * 0.22}" fill="${withAlpha(bloom.accent, 0.4)}" /></g>`;
+}
+
+function buildCamelliaFlower(x, y, radius, bloom) {
+  return `
+    ${buildRadialFlower(x, y, radius, 8, bloom, { center: radius * 0.22, width: radius * 0.2, length: radius * 0.44 })}
+    ${buildRadialFlower(x, y, radius * 0.58, 6, bloom, { center: radius * 0.12, width: radius * 0.14, length: radius * 0.28 })}
+  `;
 }
 
 function renderCalendar() {

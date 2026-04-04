@@ -28,6 +28,8 @@
   --radius-lg: 26px;
   --radius-md: 20px;
   --radius-sm: 16px;
+  --month-flower-left: none;
+  --month-flower-right: none;
 }
 
 html[data-theme="dark"] {
@@ -64,6 +66,38 @@ body {
   margin: 0;
   color: var(--text);
   font-family: "Manrope", "Avenir Next", "SF Pro Display", sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-repeat: no-repeat;
+  opacity: 0.22;
+  filter: blur(8px) saturate(0.9);
+}
+
+body::before {
+  background-image: var(--month-flower-left);
+  background-position: left -34px top 120px;
+  background-size: min(34vw, 270px) auto;
+}
+
+body::after {
+  background-image: var(--month-flower-right);
+  background-position: right -38px bottom 96px;
+  background-size: min(32vw, 250px) auto;
+}
+
+html[data-theme="dark"] body::before,
+html[data-theme="dark"] body::after {
+  opacity: 0.16;
+  filter: blur(10px) saturate(0.82);
 }
 
 button,
@@ -82,6 +116,8 @@ button {
   width: min(100%, 740px);
   margin: 0 auto;
   padding: calc(20px + env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom));
+  position: relative;
+  z-index: 1;
 }
 
 .hero-card,
@@ -1005,6 +1041,16 @@ html[data-theme="dark"] .day-cell.is-weekend.is-work {
 }
 
 @media (max-width: 540px) {
+  body::before {
+    background-position: left -48px top 164px;
+    background-size: min(44vw, 220px) auto;
+  }
+
+  body::after {
+    background-position: right -42px bottom 130px;
+    background-size: min(42vw, 205px) auto;
+  }
+
   .panel-heading {
     flex-direction: column;
     align-items: flex-start;
