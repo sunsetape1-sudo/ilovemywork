@@ -392,14 +392,16 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) auto auto;
+  grid-template-columns: minmax(0, 1.5fr) 88px 180px 92px auto;
   gap: 8px;
   align-items: end;
   margin-top: 12px;
 }
 
 .custom-field,
-.custom-color-field {
+.custom-color-field,
+.custom-select-field,
+.custom-priority-field {
   display: grid;
   gap: 6px;
 }
@@ -411,7 +413,9 @@ html[data-theme="dark"] .note-history-item {
 }
 
 .custom-input,
-.custom-color-input {
+.custom-color-input,
+.custom-select-input,
+.custom-number-input {
   min-height: 46px;
   border: 0;
   border-radius: 16px;
@@ -430,6 +434,13 @@ html[data-theme="dark"] .note-history-item {
   padding: 6px;
 }
 
+.custom-select-input,
+.custom-number-input {
+  width: 100%;
+  padding: 0 14px;
+  appearance: none;
+}
+
 .custom-color-input::-webkit-color-swatch-wrapper {
   padding: 0;
 }
@@ -441,6 +452,13 @@ html[data-theme="dark"] .note-history-item {
 
 .custom-add-button {
   min-height: 46px;
+}
+
+.custom-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .custom-delete-button {
@@ -1022,13 +1040,16 @@ html[data-theme="dark"] .day-cell.is-weekend.is-work {
   }
 
   .custom-form {
-    grid-template-columns: 1fr 88px;
+    grid-template-columns: 1fr 1fr;
   }
 
   .custom-field {
     grid-column: 1 / -1;
   }
 
+  .custom-color-field,
+  .custom-select-field,
+  .custom-priority-field,
   .custom-add-button {
     grid-column: 1 / -1;
   }

@@ -5,11 +5,18 @@ const PREDICTION_DATA_URL = "./predictions.json";
 const HOLIDAY_API_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 const COUNTRY_CODE = "RU";
 const DEFAULT_CUSTOM_COLOR = "#7fa8ff";
-const MAX_CUSTOM_PROCEDURES = 20;
+const DEFAULT_CUSTOM_PRIORITY = 50;
+const MAX_CUSTOM_PROCEDURES = 100;
+const REPEAT_MODE_SINGLE = "single_month";
+const REPEAT_MODE_CARRY = "carry_forward";
+const REPEAT_MODE_BIRTHDAY = "birthday_yearly";
 const LEGACY_MANICURE_PROCEDURE = {
   id: "legacy-manicure",
   name: "Маникюр",
   color: "#e493cb",
+  priority: DEFAULT_CUSTOM_PRIORITY,
+  repeatMode: REPEAT_MODE_SINGLE,
+  anchorMonthKey: null,
 };
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const DAY_NAMES = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
@@ -51,6 +58,9 @@ const ui = {
   customBrushEmpty: document.querySelector("#customBrushEmpty"),
   customProcedureName: document.querySelector("#customProcedureName"),
   customProcedureColor: document.querySelector("#customProcedureColor"),
+  customProcedureRepeat: document.querySelector("#customProcedureRepeat"),
+  customProcedurePriority: document.querySelector("#customProcedurePriority"),
+  customHint: document.querySelector("#customHint"),
   addCustomProcedureButton: document.querySelector("#addCustomProcedureButton"),
   deleteCustomProcedureButton: document.querySelector("#deleteCustomProcedureButton"),
   exportDataButton: document.querySelector("#exportDataButton"),
@@ -114,6 +124,7 @@ function loadState() {
         entries: {},
         holidaysCache: {},
         customProcedures: [],
+        customEvents: [],
         lastViewedMonth: null,
         lastBrush: "work",
         selectedDateKey: null,
@@ -121,28 +132,39 @@ function loadState() {
     }
 
     const parsed = JSON.parse(raw);
-    const customProcedures = ensureLegacyManicureProcedure(
+    let customProcedures = ensureLegacyManicureProcedure(
       sanitizeCustomProcedures(parsed.customProcedures || []),
       hasLegacyManicureEntries(parsed.entries || {})
     );
+    let customEvents = sanitizeCustomEvents(
+      parsed.customEvents || extractLegacyCustomEvents(parsed.entries || {}, customProcedures),
+      customProcedures
+    );
+    ({ customProcedures, customEvents } = migrateCustomProcedureScopes(
+      customProcedures,
+      customEvents,
+      parsed.lastViewedMonth || formatMonthKey(today)
+    ));
     return {
       entries: sanitizeEntries(parsed.entries || {}, customProcedures),
       holidaysCache: parsed.holidaysCache || {},
       customProcedures,
+      customEvents,
       lastViewedMonth: parsed.lastViewedMonth || null,
       lastBrush: parsed.lastBrush || "work",
       selectedDateKey: parsed.selectedDateKey || null,
     };
   } catch (error) {
     console.error("Не удалось прочитать сохранённые данные", error);
-    return {
-      entries: {},
-      holidaysCache: {},
-      customProcedures: [],
-      lastViewedMonth: null,
-      lastBrush: "work",
-      selectedDateKey: null,
-    };
+      return {
+        entries: {},
+        holidaysCache: {},
+        customProcedures: [],
+        customEvents: [],
+        lastViewedMonth: null,
+        lastBrush: "work",
+        selectedDateKey: null,
+      };
   }
 }
 
@@ -151,6 +173,7 @@ function persistState() {
     entries: initialState.entries,
     holidaysCache: Object.fromEntries(holidayCache.entries()),
     customProcedures: initialState.customProcedures,
+    customEvents: initialState.customEvents,
     lastViewedMonth: formatMonthKey(viewDate),
     lastBrush: activeBrush,
     selectedDateKey,
@@ -264,6 +287,10 @@ function bindEvents() {
     }
   });
 
+  ui.customProcedureName.addEventListener("input", () => {
+    syncBirthdayRepeatMode();
+  });
+
   ui.calendarGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-date]");
     if (!button) {
@@ -276,19 +303,10 @@ function bindEvents() {
 
     if (activeBrush === "clear") {
       delete currentEntry.work;
-      delete currentEntry.manicure;
-      delete currentEntry.customMarks;
       setEntry(dateKey, currentEntry);
+      clearCustomMarksForDate(dateKey);
     } else if (isCustomBrushId(activeBrush)) {
-      const procedureId = activeBrush.replace("custom:", "");
-      const currentMarks = new Set(Array.isArray(currentEntry.customMarks) ? currentEntry.customMarks : []);
-      if (currentMarks.has(procedureId)) {
-        currentMarks.delete(procedureId);
-      } else {
-        currentMarks.add(procedureId);
-      }
-      currentEntry.customMarks = [...currentMarks];
-      setEntry(dateKey, currentEntry);
+      toggleCustomProcedureOnDate(dateKey, activeBrush.replace("custom:", ""));
     } else {
       currentEntry[activeBrush] = !currentEntry[activeBrush];
       setEntry(dateKey, currentEntry);
@@ -363,6 +381,7 @@ function renderBrushPicker() {
 }
 
 function render() {
+  ensureActiveBrushAvailable();
   renderTodayDate();
   renderMonthHeading();
   renderLegend();
@@ -379,6 +398,17 @@ function render() {
   persistState();
 }
 
+function ensureActiveBrushAvailable() {
+  if (!isCustomBrushId(activeBrush)) {
+    return;
+  }
+
+  const procedure = getActiveCustomProcedure();
+  if (!procedure || !isProcedureVisibleInMonth(procedure, formatMonthKey(viewDate))) {
+    activeBrush = "work";
+  }
+}
+
 function renderTodayDate() {
   ui.todayDateLabel.textContent = formatTodayHeadline(today);
 }
@@ -390,7 +420,9 @@ function renderLegend() {
     { tone: "work", label: "Красный — смена" },
     { tone: "note", label: "Жёлтый — заметка" },
     { tone: "holiday", label: "Золотая звезда — праздник" },
-    ...initialState.customProcedures.map((procedure) => ({
+    ...getVisibleCustomProcedures()
+      .sort(compareProceduresByPriority)
+      .map((procedure) => ({
       tone: "custom",
       label: `${capitalizeColorName(procedure.color)} — ${procedure.name}`,
       color: procedure.color,
@@ -444,8 +476,8 @@ function renderCalendar() {
     const dayDate = new Date(year, month, day);
     const dateKey = formatDateKey(year, month, day);
     const entry = initialState.entries[dateKey] || {};
-    const customProcedures = getProceduresForEntry(entry);
-    const primaryCustomProcedure = customProcedures.at(-1) || null;
+    const customProcedures = getProceduresForDate(dateKey);
+    const primaryCustomProcedure = getPrimaryProcedure(customProcedures);
     const holiday = getHolidayByDate(dateKey);
     const isToday = dateKey === formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
     const isSelected = dateKey === selectedDateKey;
@@ -500,9 +532,7 @@ function renderStats() {
   const workCount = Object.entries(initialState.entries).filter(
     ([dateKey, value]) => dateKey.startsWith(monthPrefix) && value.work
   ).length;
-  const customCount = Object.entries(initialState.entries)
-    .filter(([dateKey]) => dateKey.startsWith(monthPrefix))
-    .reduce((total, [, value]) => total + (Array.isArray(value.customMarks) ? value.customMarks.length : 0), 0);
+  const customCount = getVisibleDateKeysForMonth().reduce((total, dateKey) => total + getProceduresForDate(dateKey).length, 0);
   const holidayCount = getCurrentMonthHolidays().length;
 
   ui.workCount.textContent = String(workCount);
@@ -517,7 +547,7 @@ function renderSelectedDay() {
   const month = monthNumber - 1;
   const currentDate = new Date(year, month, dayNumber);
   const entry = initialState.entries[dateKey] || {};
-  const customProcedures = getProceduresForEntry(entry);
+  const customProcedures = getProceduresForDate(dateKey);
   const holiday = getHolidayByDate(dateKey);
   const isToday = dateKey === formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -554,7 +584,7 @@ function renderSelectedDay() {
 
 function renderCustomBrushes() {
   ui.customBrushList.innerHTML = "";
-  const procedures = initialState.customProcedures;
+  const procedures = getVisibleCustomProcedures().sort(compareProceduresByPriority);
   ui.customBrushEmpty.hidden = Boolean(procedures.length);
 
   procedures.forEach((procedure) => {
@@ -573,7 +603,7 @@ function renderCustomBrushes() {
 
     const label = document.createElement("span");
     label.className = "custom-brush-label";
-    label.textContent = procedure.name;
+    label.textContent = `${procedure.name} · ${getRepeatModeLabel(procedure.repeatMode)} · приоритет ${procedure.priority}`;
 
     button.append(swatch, label);
     ui.customBrushList.append(button);
@@ -772,25 +802,19 @@ function buildDayAriaLabel({
 }
 
 function sanitizeEntries(entries, customProcedures = []) {
-  const validCustomIds = new Set(customProcedures.map((procedure) => procedure.id));
-  const legacyManicureId = getLegacyManicureProcedureId(customProcedures);
   return Object.fromEntries(
     Object.entries(entries)
       .map(([dateKey, value]) => {
-        const normalized = sanitizeEntryValue(value, validCustomIds, legacyManicureId);
+        const normalized = sanitizeEntryValue(value);
         return normalized ? [dateKey, normalized] : null;
       })
       .filter(Boolean)
   );
 }
 
-function sanitizeEntryValue(value, validCustomIds, legacyManicureId = null) {
+function sanitizeEntryValue(value) {
   if (value === "work") {
     return { work: true };
-  }
-
-  if (value === "nails" || value === "manicure") {
-    return legacyManicureId ? { customMarks: [legacyManicureId] } : null;
   }
 
   if (!value || typeof value !== "object") {
@@ -801,15 +825,6 @@ function sanitizeEntryValue(value, validCustomIds, legacyManicureId = null) {
 
   if (value.work) {
     normalized.work = true;
-  }
-
-  const customMarks = new Set(Array.isArray(value.customMarks) ? value.customMarks.filter((item) => validCustomIds.has(item)) : []);
-  if (legacyManicureId && (value.nails || value.manicure)) {
-    customMarks.add(legacyManicureId);
-  }
-
-  if (customMarks.size) {
-    normalized.customMarks = [...customMarks];
   }
 
   if (typeof value.note === "string" && value.note.trim()) {
@@ -829,7 +844,6 @@ function sanitizeCustomProcedures(procedures) {
   }
 
   const seenIds = new Set();
-  const seenNames = new Set();
 
   return procedures
     .map((procedure, index) => {
@@ -842,27 +856,172 @@ function sanitizeCustomProcedures(procedures) {
         return null;
       }
 
-      const normalizedNameKey = normalizeProcedureKey(name);
       const id =
         typeof procedure.id === "string" && procedure.id.trim()
           ? procedure.id.trim()
           : createStableProcedureId(name, index);
       const color = normalizeHexColor(procedure.color);
+      const priority = normalizeProcedurePriority(procedure.priority);
+      const repeatMode = normalizeRepeatMode(procedure.repeatMode, name);
+      const anchorMonthKey = normalizeMonthKey(procedure.anchorMonthKey);
 
-      if (seenIds.has(id) || seenNames.has(normalizedNameKey)) {
+      if (seenIds.has(id)) {
         return null;
       }
 
       seenIds.add(id);
-      seenNames.add(normalizedNameKey);
 
       return {
         id,
         name,
         color,
+        priority,
+        repeatMode,
+        anchorMonthKey,
       };
     })
     .filter(Boolean);
+}
+
+function sanitizeCustomEvents(events, customProcedures = []) {
+  if (!Array.isArray(events)) {
+    return [];
+  }
+
+  const validProcedureIds = new Set(customProcedures.map((procedure) => procedure.id));
+  const seenIds = new Set();
+
+  const procedureById = new Map(customProcedures.map((procedure) => [procedure.id, procedure]));
+
+  return events
+    .map((event, index) => {
+      if (!event || typeof event !== "object") {
+        return null;
+      }
+
+      const procedureId = typeof event.procedureId === "string" ? event.procedureId.trim() : "";
+      if (!validProcedureIds.has(procedureId)) {
+        return null;
+      }
+
+      const startDateKey = normalizeDateKey(event.startDateKey);
+      if (!startDateKey) {
+        return null;
+      }
+
+      const id =
+        typeof event.id === "string" && event.id.trim()
+          ? event.id.trim()
+          : createStableProcedureId(`${procedureId}-${startDateKey}`, index);
+      if (seenIds.has(id)) {
+        return null;
+      }
+      seenIds.add(id);
+
+      return {
+        id,
+        procedureId,
+        startDateKey,
+        repeatMode: normalizeRepeatMode(event.repeatMode, procedureById.get(procedureId)?.name || ""),
+        deletedOccurrences: sanitizeDeletedOccurrences(event.deletedOccurrences),
+      };
+    })
+    .filter(Boolean);
+}
+
+function migrateCustomProcedureScopes(customProcedures, customEvents, fallbackMonthKey) {
+  const normalizedFallbackMonth = normalizeMonthKey(fallbackMonthKey) || formatMonthKey(today);
+  const migratedProcedures = [];
+  const migratedEvents = customEvents.map((event) => ({ ...event, deletedOccurrences: [...event.deletedOccurrences] }));
+  const reassignedProcedureIds = new Map();
+
+  customProcedures.forEach((procedure, procedureIndex) => {
+    const procedureEvents = migratedEvents.filter((event) => event.procedureId === procedure.id);
+    const existingAnchorMonth = normalizeMonthKey(procedure.anchorMonthKey);
+
+    if (existingAnchorMonth) {
+      migratedProcedures.push({ ...procedure, anchorMonthKey: existingAnchorMonth });
+      return;
+    }
+
+    const monthKeys = [...new Set(procedureEvents.map((event) => normalizeMonthKey(event.startDateKey?.slice(0, 7))).filter(Boolean))].sort();
+
+    if (!monthKeys.length) {
+      migratedProcedures.push({
+        ...procedure,
+        anchorMonthKey: normalizedFallbackMonth,
+      });
+      return;
+    }
+
+    const primaryMonthKey = monthKeys[0];
+    migratedProcedures.push({
+      ...procedure,
+      anchorMonthKey: primaryMonthKey,
+    });
+    reassignedProcedureIds.set(`${procedure.id}:${primaryMonthKey}`, procedure.id);
+
+    monthKeys.slice(1).forEach((monthKey, monthIndex) => {
+      const nextProcedureId = createStableProcedureId(`${procedure.id}-${monthKey}`, procedureIndex + monthIndex + 1);
+      migratedProcedures.push({
+        ...procedure,
+        id: nextProcedureId,
+        anchorMonthKey: monthKey,
+      });
+      reassignedProcedureIds.set(`${procedure.id}:${monthKey}`, nextProcedureId);
+    });
+  });
+
+  migratedEvents.forEach((event) => {
+    const occurrenceMonthKey = normalizeMonthKey(event.startDateKey?.slice(0, 7));
+    const nextProcedureId = reassignedProcedureIds.get(`${event.procedureId}:${occurrenceMonthKey}`);
+    if (nextProcedureId) {
+      event.procedureId = nextProcedureId;
+    }
+  });
+
+  return {
+    customProcedures: sanitizeCustomProcedures(migratedProcedures),
+    customEvents: sanitizeCustomEvents(migratedEvents, migratedProcedures),
+  };
+}
+
+function sanitizeDeletedOccurrences(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.map(normalizeDateKey).filter(Boolean))];
+}
+
+function extractLegacyCustomEvents(entries, customProcedures = []) {
+  const validCustomIds = new Set(customProcedures.map((procedure) => procedure.id));
+  const legacyManicureId = getLegacyManicureProcedureId(customProcedures);
+  const events = [];
+
+  Object.entries(entries || {}).forEach(([dateKey, value]) => {
+    const normalizedDateKey = normalizeDateKey(dateKey);
+    if (!normalizedDateKey || !value || typeof value !== "object") {
+      return;
+    }
+
+    const marks = new Set(Array.isArray(value.customMarks) ? value.customMarks.filter((item) => validCustomIds.has(item)) : []);
+    if (legacyManicureId && (value.nails || value.manicure)) {
+      marks.add(legacyManicureId);
+    }
+
+    marks.forEach((procedureId, index) => {
+      events.push({
+        id: createStableProcedureId(`${procedureId}-${normalizedDateKey}`, index),
+        procedureId,
+        startDateKey: normalizedDateKey,
+        repeatMode: REPEAT_MODE_SINGLE,
+        deletedOccurrences: [],
+      });
+    });
+  });
+
+  return events;
 }
 
 function hasLegacyManicureEntries(entries) {
@@ -936,8 +1095,14 @@ function addOrUpdateCustomProcedure() {
   }
 
   const color = normalizeHexColor(ui.customProcedureColor.value);
+  const repeatMode = normalizeRepeatMode(ui.customProcedureRepeat.value, name);
+  const priority = normalizeProcedurePriority(ui.customProcedurePriority.value);
+  const anchorMonthKey = formatMonthKey(viewDate);
   const existing = initialState.customProcedures.find(
-    (procedure) => normalizeProcedureKey(procedure.name) === normalizeProcedureKey(name)
+    (procedure) =>
+      normalizeProcedureKey(procedure.name) === normalizeProcedureKey(name) &&
+      normalizeMonthKey(procedure.anchorMonthKey) === anchorMonthKey &&
+      normalizeRepeatMode(procedure.repeatMode, procedure.name) === repeatMode
   );
 
   if (existing) {
@@ -958,12 +1123,18 @@ function addOrUpdateCustomProcedure() {
     id: createProcedureId(),
     name,
     color,
+    priority,
+    repeatMode,
+    anchorMonthKey,
   };
   initialState.customProcedures.push(procedure);
   activeBrush = `custom:${procedure.id}`;
 
   ui.customProcedureName.value = "";
   ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
+  ui.customProcedurePriority.value = String(DEFAULT_CUSTOM_PRIORITY);
+  ui.customProcedureRepeat.value = REPEAT_MODE_SINGLE;
+  maybeNotifyBirthdayRule(procedure);
   persistState();
   render();
 }
@@ -986,18 +1157,13 @@ function deleteActiveCustomProcedure() {
     (procedure) => procedure.id !== activeProcedure.id
   );
 
-  Object.entries(initialState.entries).forEach(([dateKey, entry]) => {
-    if (!Array.isArray(entry.customMarks) || !entry.customMarks.includes(activeProcedure.id)) {
-      return;
-    }
-
-    const nextEntry = { ...entry, customMarks: entry.customMarks.filter((mark) => mark !== activeProcedure.id) };
-    setEntry(dateKey, nextEntry);
-  });
+  initialState.customEvents = initialState.customEvents.filter((event) => event.procedureId !== activeProcedure.id);
 
   activeBrush = "work";
   ui.customProcedureName.value = "";
   ui.customProcedureColor.value = DEFAULT_CUSTOM_COLOR;
+  ui.customProcedurePriority.value = String(DEFAULT_CUSTOM_PRIORITY);
+  ui.customProcedureRepeat.value = REPEAT_MODE_SINGLE;
   persistState();
   render();
 }
@@ -1047,12 +1213,8 @@ function getReadableTextColor(color) {
   return brightness > 176 ? "#1f1a2f" : "#ffffff";
 }
 
-function getValidCustomProcedureIds() {
-  return new Set(initialState.customProcedures.map((procedure) => procedure.id));
-}
-
 function setEntry(dateKey, entry) {
-  const normalized = sanitizeEntryValue(entry, getValidCustomProcedureIds(), getLegacyManicureProcedureId());
+  const normalized = sanitizeEntryValue(entry);
   if (normalized) {
     initialState.entries[dateKey] = normalized;
   } else {
@@ -1082,6 +1244,258 @@ function getActiveCustomProcedure() {
   return isCustomBrushId(activeBrush) ? getProcedureById(activeBrush.replace("custom:", "")) : null;
 }
 
+function getVisibleCustomProcedures() {
+  const currentMonthKey = formatMonthKey(viewDate);
+  return initialState.customProcedures.filter((procedure) => isProcedureVisibleInMonth(procedure, currentMonthKey));
+}
+
+function isProcedureVisibleInMonth(procedure, monthKey) {
+  const anchorMonthKey = normalizeMonthKey(procedure.anchorMonthKey) || monthKey;
+  if (procedure.repeatMode === REPEAT_MODE_CARRY) {
+    return monthKey >= anchorMonthKey;
+  }
+
+  if (procedure.repeatMode === REPEAT_MODE_BIRTHDAY) {
+    return monthKey.slice(5, 7) === anchorMonthKey.slice(5, 7);
+  }
+
+  return monthKey === anchorMonthKey;
+}
+
+function compareProceduresByPriority(left, right) {
+  return right.priority - left.priority || left.name.localeCompare(right.name, "ru-RU");
+}
+
+function getRepeatModeLabel(repeatMode) {
+  if (repeatMode === REPEAT_MODE_CARRY) {
+    return "ежемесячно";
+  }
+
+  if (repeatMode === REPEAT_MODE_BIRTHDAY) {
+    return "раз в год";
+  }
+
+  return "только месяц";
+}
+
+function normalizeRepeatMode(value, name = "") {
+  if (isBirthdayProcedureName(name)) {
+    return REPEAT_MODE_BIRTHDAY;
+  }
+
+  return [REPEAT_MODE_SINGLE, REPEAT_MODE_CARRY, REPEAT_MODE_BIRTHDAY].includes(value) ? value : REPEAT_MODE_SINGLE;
+}
+
+function normalizeProcedurePriority(value) {
+  const priority = Number.parseInt(value, 10);
+  if (!Number.isFinite(priority)) {
+    return DEFAULT_CUSTOM_PRIORITY;
+  }
+
+  return Math.min(100, Math.max(1, priority));
+}
+
+function normalizeMonthKey(value) {
+  return /^\d{4}-\d{2}$/.test(String(value || "").trim()) ? String(value).trim() : null;
+}
+
+function normalizeDateKey(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim()) ? String(value).trim() : null;
+}
+
+function isBirthdayProcedureName(name) {
+  return /^ДР\b/i.test(normalizeProcedureName(name));
+}
+
+function syncBirthdayRepeatMode() {
+  if (isBirthdayProcedureName(ui.customProcedureName.value)) {
+    ui.customProcedureRepeat.value = REPEAT_MODE_BIRTHDAY;
+  }
+}
+
+function maybeNotifyBirthdayRule(procedure) {
+  if (procedure.repeatMode === REPEAT_MODE_BIRTHDAY) {
+    window.alert("Метка с префиксом «ДР» будет повторяться каждый год в этом месяце.");
+  }
+}
+
+function getProceduresForDate(dateKey) {
+  return getCustomEventInstancesForDate(dateKey)
+    .map(({ procedure }) => procedure)
+    .filter(Boolean)
+    .sort(compareProceduresByPriority);
+}
+
+function getPrimaryProcedure(procedures) {
+  return procedures.slice().sort(compareProceduresByPriority)[0] || null;
+}
+
+function getCustomEventInstancesForDate(dateKey) {
+  return initialState.customEvents
+    .map((event) => {
+      const occurrenceDateKey = getEventOccurrenceDateKey(event, dateKey);
+      if (!occurrenceDateKey || occurrenceDateKey !== dateKey) {
+        return null;
+      }
+
+      const procedure = getProcedureById(event.procedureId);
+      if (!procedure) {
+        return null;
+      }
+
+      return { event, procedure };
+    })
+    .filter(Boolean)
+    .sort((left, right) => compareProceduresByPriority(left.procedure, right.procedure));
+}
+
+function getEventOccurrenceDateKey(event, targetDateKey) {
+  if (!event || !event.startDateKey) {
+    return null;
+  }
+
+  if (event.deletedOccurrences.includes(targetDateKey)) {
+    return null;
+  }
+
+  return getEventOccurrenceDateKeyIgnoringExceptions(event, targetDateKey);
+}
+
+function getEventOccurrenceDateKeyIgnoringExceptions(event, targetDateKey) {
+  if (!event || !event.startDateKey) {
+    return null;
+  }
+
+  if (event.repeatMode === REPEAT_MODE_SINGLE) {
+    return event.startDateKey === targetDateKey ? targetDateKey : null;
+  }
+
+  const targetDate = parseDateKey(targetDateKey);
+  const startDate = parseDateKey(event.startDateKey);
+  if (!targetDate || !startDate) {
+    return null;
+  }
+
+  if (event.repeatMode === REPEAT_MODE_CARRY) {
+    const targetMonthKey = formatMonthPrefix(targetDate.getFullYear(), targetDate.getMonth());
+    const startMonthKey = formatMonthPrefix(startDate.getFullYear(), startDate.getMonth());
+    if (targetMonthKey < startMonthKey) {
+      return null;
+    }
+    const occurrence = getClampedDateKey(targetDate.getFullYear(), targetDate.getMonth(), startDate.getDate());
+    return occurrence === targetDateKey ? occurrence : null;
+  }
+
+  if (event.repeatMode === REPEAT_MODE_BIRTHDAY) {
+    if (targetDate.getMonth() !== startDate.getMonth()) {
+      return null;
+    }
+    const occurrence = getClampedDateKey(targetDate.getFullYear(), targetDate.getMonth(), startDate.getDate());
+    return occurrence === targetDateKey ? occurrence : null;
+  }
+
+  return null;
+}
+
+function getClampedDateKey(year, monthIndex, desiredDay) {
+  const maxDay = new Date(year, monthIndex + 1, 0).getDate();
+  return formatDateKey(year, monthIndex, Math.min(desiredDay, maxDay));
+}
+
+function parseDateKey(dateKey) {
+  const normalized = normalizeDateKey(dateKey);
+  if (!normalized) {
+    return null;
+  }
+  const [year, month, day] = normalized.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function createCustomEvent(procedureId, dateKey, repeatMode) {
+  return {
+    id: createProcedureId(),
+    procedureId,
+    startDateKey: dateKey,
+    repeatMode,
+    deletedOccurrences: [],
+  };
+}
+
+function clearCustomMarksForDate(dateKey) {
+  const instances = getCustomEventInstancesForDate(dateKey);
+  if (!instances.length) {
+    return;
+  }
+
+  instances.forEach(({ event }) => {
+    if (event.repeatMode === REPEAT_MODE_SINGLE) {
+      initialState.customEvents = initialState.customEvents.filter((item) => item.id !== event.id);
+      return;
+    }
+
+    if (!event.deletedOccurrences.includes(dateKey)) {
+      event.deletedOccurrences = [...event.deletedOccurrences, dateKey];
+    }
+  });
+}
+
+function toggleCustomProcedureOnDate(dateKey, procedureId) {
+  const procedure = getProcedureById(procedureId);
+  if (!procedure) {
+    return;
+  }
+
+  const existingInstance = getCustomEventInstancesForDate(dateKey).find(({ procedure: item }) => item.id === procedureId);
+  if (existingInstance) {
+    removeCustomEventInstance(existingInstance.event, dateKey);
+    return;
+  }
+
+  const suppressedInstance = initialState.customEvents.find(
+    (event) =>
+      event.procedureId === procedureId &&
+      event.deletedOccurrences.includes(dateKey) &&
+      getEventOccurrenceDateKeyIgnoringExceptions(event, dateKey) === dateKey
+  );
+
+  if (suppressedInstance) {
+    suppressedInstance.deletedOccurrences = suppressedInstance.deletedOccurrences.filter((item) => item !== dateKey);
+    return;
+  }
+
+  initialState.customEvents.push(createCustomEvent(procedureId, dateKey, procedure.repeatMode));
+}
+
+function removeCustomEventInstance(event, dateKey) {
+  if (event.repeatMode === REPEAT_MODE_SINGLE) {
+    initialState.customEvents = initialState.customEvents.filter((item) => item.id !== event.id);
+    return;
+  }
+
+  const choice = window.prompt(
+    "Удалить метку:\n1 — только на этой дате\n2 — удалить серию во всех месяцах\n0 — отмена",
+    "1"
+  );
+
+  if (choice === "2") {
+    initialState.customEvents = initialState.customEvents.filter((item) => item.id !== event.id);
+    return;
+  }
+
+  if (choice === "1") {
+    if (!event.deletedOccurrences.includes(dateKey)) {
+      event.deletedOccurrences = [...event.deletedOccurrences, dateKey];
+    }
+  }
+}
+
+function getVisibleDateKeysForMonth() {
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, index) => formatDateKey(year, month, index + 1));
+}
+
 function renderCustomProcedureFormState() {
   const activeProcedure = getActiveCustomProcedure();
   if (!ui.customProcedureName.value.trim()) {
@@ -1094,9 +1508,10 @@ function renderCustomProcedureFormState() {
     initialState.customProcedures.length >= MAX_CUSTOM_PROCEDURES
       ? `Достигнут предел: ${MAX_CUSTOM_PROCEDURES} меток`
       : "";
-  ui.customBrushEmpty.textContent = initialState.customProcedures.length
+  ui.customBrushEmpty.textContent = getVisibleCustomProcedures().length
     ? ""
     : "Пока нет своих меток.";
+  ui.customHint.textContent = `Открыт ${formatMonthKey(viewDate)}. Одноразовые метки видны только в этом месяце, переносимые идут дальше, «ДР» повторяются раз в год.`;
   ui.deleteCustomProcedureButton.textContent = activeProcedure
     ? `Удалить метку «${activeProcedure.name}»`
     : "Удалить выбранную метку";
@@ -1135,6 +1550,7 @@ function exportDataBackup() {
       entries: initialState.entries,
       holidaysCache: Object.fromEntries(holidayCache.entries()),
       customProcedures: initialState.customProcedures,
+      customEvents: initialState.customEvents,
       lastViewedMonth: formatMonthKey(viewDate),
       lastBrush: activeBrush,
       selectedDateKey,
@@ -1171,15 +1587,25 @@ async function importDataBackup(file) {
       return;
     }
 
-    const customProcedures = ensureLegacyManicureProcedure(
+    let customProcedures = ensureLegacyManicureProcedure(
       sanitizeCustomProcedures(payload.state.customProcedures || []),
       hasLegacyManicureEntries(payload.state.entries || {})
     );
+    let customEvents = sanitizeCustomEvents(
+      payload.state.customEvents || extractLegacyCustomEvents(payload.state.entries || {}, customProcedures),
+      customProcedures
+    );
+    ({ customProcedures, customEvents } = migrateCustomProcedureScopes(
+      customProcedures,
+      customEvents,
+      payload.state.lastViewedMonth || formatMonthKey(today)
+    ));
 
     const restoredState = {
       entries: sanitizeEntries(payload.state.entries || {}, customProcedures),
       holidaysCache: payload.state.holidaysCache || {},
       customProcedures,
+      customEvents,
       lastViewedMonth: payload.state.lastViewedMonth || null,
       lastBrush: payload.state.lastBrush || "work",
       selectedDateKey: payload.state.selectedDateKey || null,
@@ -1196,14 +1622,6 @@ async function importDataBackup(file) {
     console.error("Не удалось загрузить резервную копию", error);
     window.alert("Не удалось загрузить файл. Проверь, что это JSON-резервная копия приложения.");
   }
-}
-
-function getProceduresForEntry(entry) {
-  if (!entry || !Array.isArray(entry.customMarks)) {
-    return [];
-  }
-
-  return entry.customMarks.map((procedureId) => getProcedureById(procedureId)).filter(Boolean);
 }
 
 function buildSelectedDayCopy(entry, customProcedures, holiday) {

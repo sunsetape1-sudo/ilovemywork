@@ -92,7 +92,7 @@
         <div class="custom-tools custom-tools-standalone">
           <div class="panel-heading custom-tools-heading">
             <h2>Свои метки</h2>
-            <p>Можно добавить до 20 меток.</p>
+            <p>Можно добавить до 100 меток для открытого месяца.</p>
           </div>
           <div class="custom-brushes" id="customBrushList" aria-label="Свои метки"></div>
           <p class="custom-empty" id="customBrushEmpty">Пока нет своих меток.</p>
@@ -105,8 +105,23 @@
               <span class="custom-field-label">Цвет</span>
               <input class="custom-color-input" id="customProcedureColor" type="color" value="#7fa8ff">
             </label>
+            <label class="custom-select-field" for="customProcedureRepeat">
+              <span class="custom-field-label">Повторение</span>
+              <select class="custom-select-input" id="customProcedureRepeat">
+                <option value="single_month">Только этот месяц</option>
+                <option value="carry_forward">Переносить дальше</option>
+                <option value="birthday_yearly">Каждый год (ДР)</option>
+              </select>
+            </label>
+            <label class="custom-priority-field" for="customProcedurePriority">
+              <span class="custom-field-label">Приоритет</span>
+              <input class="custom-number-input" id="customProcedurePriority" type="number" min="1" max="100" value="50">
+            </label>
             <button class="secondary-button custom-add-button" id="addCustomProcedureButton" type="button">Добавить</button>
           </div>
+          <p class="custom-hint" id="customHint">
+            Метка создаётся для открытого месяца. Если название начинается с «ДР», метка будет повторяться каждый год.
+          </p>
           <button class="custom-delete-button" id="deleteCustomProcedureButton" type="button" hidden>Удалить выбранную метку</button>
         </div>
       </section>
