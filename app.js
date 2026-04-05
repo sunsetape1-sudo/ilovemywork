@@ -546,13 +546,6 @@ function renderCalendar() {
     marker.append(number);
     button.append(marker);
 
-    if (isToday) {
-      const badge = document.createElement("span");
-      badge.className = "today-badge";
-      badge.textContent = "Сегодня";
-      button.append(badge);
-    }
-
     ui.calendarGrid.append(button);
   }
 }
