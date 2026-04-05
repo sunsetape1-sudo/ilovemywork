@@ -920,6 +920,7 @@ html[data-theme="dark"] .day-cell.is-weekend.is-work {
 
 .day-cell.is-today .day-number {
   color: var(--today);
+  font-weight: 800;
 }
 
 .day-cell.has-custom-mark {
